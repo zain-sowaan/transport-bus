@@ -36,6 +36,10 @@
   "needs_reallocation",
   "rejection_reason",
   "reminder_sent",
+  "column_break_status",
+  "approved_by",
+  "approved_on",
+  "timesheet",
   "execution_section",
   "start_odometer",
   "vehicle_photo",
@@ -252,6 +256,32 @@
    "fieldtype": "Check",
    "hidden": 1,
    "label": "Reminder Sent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Set when Transport In-Charge/Operations approves a Completed trip - only Approved trips can be pulled onto a Transport Timesheet.",
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1
+  },
+  {
+   "description": "Set once this trip is pulled onto a Transport Timesheet - prevents the same trip being billed twice.",
+   "fieldname": "timesheet",
+   "fieldtype": "Link",
+   "label": "Timesheet",
+   "options": "Transport Timesheet",
    "read_only": 1
   },
   {

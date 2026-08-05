@@ -1,0 +1,177 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-COC-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "details_section",
+  "project",
+  "customer",
+  "transport_timesheet",
+  "column_break_details",
+  "sales_invoice",
+  "po_no",
+  "period_from",
+  "period_to",
+  "total_trips",
+  "status_section",
+  "status",
+  "issued_on",
+  "column_break_status",
+  "received_on",
+  "signed_copy"
+ ],
+ "fields": [
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fetch_from": "transport_timesheet.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "transport_timesheet.customer",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_timesheet",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Transport Timesheet",
+   "options": "Transport Timesheet",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "transport_timesheet.sales_invoice",
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "sales_invoice.po_no",
+   "fieldname": "po_no",
+   "fieldtype": "Data",
+   "label": "Customer PO No.",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "transport_timesheet.period_from",
+   "fieldname": "period_from",
+   "fieldtype": "Date",
+   "label": "Period From",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "transport_timesheet.period_to",
+   "fieldname": "period_to",
+   "fieldtype": "Date",
+   "label": "Period To",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "transport_timesheet.total_trips",
+   "fieldname": "total_trips",
+   "fieldtype": "Int",
+   "label": "Total Trips",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nIssued\nSigned Copy Received",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "issued_on",
+   "fieldtype": "Date",
+   "label": "Issued On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "received_on",
+   "fieldtype": "Date",
+   "label": "Received On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "signed_copy",
+   "fieldtype": "Attach",
+   "label": "Signed Copy"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Certificate of Completion",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Accounts",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport Operations"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "project",
+ "track_changes": 1
+}

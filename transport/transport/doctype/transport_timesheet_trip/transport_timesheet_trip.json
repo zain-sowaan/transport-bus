@@ -1,0 +1,133 @@
+{
+ "actions": [],
+ "creation": "2026-08-05 16:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "trip",
+  "trip_date",
+  "route",
+  "direction",
+  "column_break_1",
+  "driver",
+  "vehicle",
+  "scheduled_time",
+  "actual_start_time",
+  "actual_end_time",
+  "column_break_2",
+  "duty_type",
+  "is_additional",
+  "is_holiday"
+ ],
+ "fields": [
+  {
+   "fieldname": "trip",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Trip",
+   "options": "Trip",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "trip_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Route",
+   "options": "Route",
+   "read_only": 1
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Direction",
+   "options": "Pickup\nDrop",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Driver",
+   "options": "Driver"
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vehicle",
+   "options": "Rental Vehicle"
+  },
+  {
+   "fieldname": "scheduled_time",
+   "fieldtype": "Time",
+   "label": "Scheduled Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_start_time",
+   "fieldtype": "Time",
+   "label": "Actual Start",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_end_time",
+   "fieldtype": "Time",
+   "label": "Actual End",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "duty_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Duty Type",
+   "options": "Duty\nOT",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_additional",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Additional",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_holiday",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "PH",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-05 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Transport Timesheet Trip",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

@@ -19,6 +19,19 @@ frappe.ui.form.on("Trip", {
 				scheduled_time: frm.doc.scheduled_time,
 			},
 		}));
+
+		const can_approve = ["Transport In-Charge", "Transport Operations", "System Manager"].some(
+			(role) => frappe.user.has_role(role)
+		);
+		if (!frm.is_new() && frm.doc.status === "Completed" && can_approve) {
+			frm.add_custom_button(__("Approve"), () => {
+				frappe.call({
+					method: "transport.transport.operations.approve_trip",
+					args: { trip_name: frm.doc.name },
+					callback: () => frm.reload_doc(),
+				});
+			});
+		}
 	},
 
 	route(frm) {

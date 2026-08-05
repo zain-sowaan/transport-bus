@@ -18,14 +18,35 @@ fixtures = [
 	},
 	{
 		"doctype": "Role",
-		"filters": [["role_name", "in", ["Transport Driver", "Transport In-Charge", "Transport Operations"]]],
+		"filters": [
+			[
+				"role_name",
+				"in",
+				["Transport Driver", "Transport In-Charge", "Transport Operations", "Transport Accounts"],
+			]
+		],
+	},
+	{
+		"doctype": "Client Script",
+		"filters": {"module": "Transport"},
+	},
+	{
+		# Matched to Trip Expense.expense_type's Select options exactly -
+		# Expense Claim Type's autoname is field:expense_type, so the name
+		# IS the mapping, no lookup table needed.
+		"doctype": "Expense Claim Type",
+		"filters": [["name", "in", ["Fuel", "Salik / Toll", "Parking", "Maintenance", "Others"]]],
 	},
 ]
 
 # Apps
 # ------------------
 
-required_apps = ["fleetify"]
+# hrms added in Phase 4: Trip Expense.book_to_expense_claim() creates a real
+# HR Expense Claim (Expense Claim Type master data too) once Accounts books
+# an approved expense - Driver/Employee themselves are core erpnext, already
+# an implicit dependency via fleetify.
+required_apps = ["fleetify", "hrms"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [

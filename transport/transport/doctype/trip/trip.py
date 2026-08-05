@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from transport.transport.utils import is_project_holiday
+
 LMV_LABEL = "LMV (Light Motor Vehicle)"
 HMV_LABEL = "HMV (Heavy Motor Vehicle)"
 
@@ -73,6 +75,11 @@ class Trip(Document):
 	def set_duty_type(self):
 		if not (self.vehicle and self.trip_date and self.vehicle_class):
 			self.duty_type = "Duty"
+			return
+
+		if is_project_holiday(self.project, self.trip_date):
+			# Weekend/PH duty is always OT, even a vehicle's first trip that day.
+			self.duty_type = "OT"
 			return
 
 		daily_limit = self.get_daily_trip_limit()

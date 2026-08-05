@@ -1,0 +1,13 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Sales Invoice",
+  "enabled": 1,
+  "modified": "2026-08-05 17:07:17.587116",
+  "module": "Transport",
+  "name": "Sales Invoice-transport-grn",
+  "script": "frappe.ui.form.on(\"Sales Invoice\", {\n\trefresh(frm) {\n\t\tif (frm.is_new() || !frm.doc.transport_timesheet) {\n\t\t\treturn;\n\t\t}\n\n\t\tif (frm.doc.grn_status === \"Pending\") {\n\t\t\tfrm.add_custom_button(__(\"Mark GRN Received\"), () => {\n\t\t\t\tfrappe.call({\n\t\t\t\t\tmethod: \"transport.transport.billing.mark_grn_received\",\n\t\t\t\t\targs: { sales_invoice: frm.doc.name },\n\t\t\t\t\tcallback: () => frm.reload_doc(),\n\t\t\t\t});\n\t\t\t}, __(\"Transport\"));\n\t\t}\n\n\t\tif (frm.doc.grn_status === \"Received\" && frm.doc.invoice_submission_status === \"Not Submitted\") {\n\t\t\tfrm.add_custom_button(__(\"Mark Invoice Submitted\"), () => {\n\t\t\t\tfrappe.call({\n\t\t\t\t\tmethod: \"transport.transport.billing.mark_invoice_submitted\",\n\t\t\t\t\targs: { sales_invoice: frm.doc.name },\n\t\t\t\t\tcallback: () => frm.reload_doc(),\n\t\t\t\t});\n\t\t\t}, __(\"Transport\"));\n\t\t}\n\n\t\tif (frm.doc.certificate_of_completion) {\n\t\t\tfrm.add_custom_button(__(\"Certificate of Completion\"), () => {\n\t\t\t\tfrappe.set_route(\"Form\", \"Certificate of Completion\", frm.doc.certificate_of_completion);\n\t\t\t}, __(\"Transport\"));\n\t\t}\n\t},\n});",
+  "view": "Form"
+ }
+]

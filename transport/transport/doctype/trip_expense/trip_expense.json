@@ -21,7 +21,8 @@
   "status",
   "column_break_approval",
   "approved_by",
-  "approved_on"
+  "approved_on",
+  "expense_claim"
  ],
  "fields": [
   {
@@ -109,7 +110,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Pending\nApproved\nRejected",
+   "options": "Pending\nApproved\nRejected\nBooked",
    "read_only": 1,
    "reqd": 1
   },
@@ -128,6 +129,14 @@
    "fieldname": "approved_on",
    "fieldtype": "Datetime",
    "label": "Approved On",
+   "read_only": 1
+  },
+  {
+   "description": "Set once Accounts books this expense to an HR Expense Claim for the driver's Employee.",
+   "fieldname": "expense_claim",
+   "fieldtype": "Link",
+   "label": "Expense Claim",
+   "options": "Expense Claim",
    "read_only": 1
   }
  ],
@@ -157,6 +166,13 @@
    "print": 1,
    "read": 1,
    "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport Accounts",
    "write": 1
   },
   {
