@@ -31,6 +31,7 @@
   "column_break_cost",
   "salik_toll_parking_cost",
   "driver_salary_cost",
+  "room_rent_cost",
   "maintenance_cost",
   "totals_section",
   "total_estimated_cost",
@@ -197,6 +198,13 @@
    "fieldname": "driver_salary_cost",
    "fieldtype": "Currency",
    "label": "Driver Salary"
+  },
+  {
+   "depends_on": "eval:doc.with_driver=='With Driver'",
+   "description": "Accommodation cost for an outsourced/company driver, where applicable.",
+   "fieldname": "room_rent_cost",
+   "fieldtype": "Currency",
+   "label": "Room Rent"
   },
   {
    "fieldname": "maintenance_cost",

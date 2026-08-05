@@ -16,8 +16,13 @@ class Trip(Document):
 	def validate(self):
 		self.set_route_endpoints()
 		self.check_double_booking()
+		self.check_blacklisted_driver()
 		self.set_duty_type()
 		self.set_assigned()
+
+	def check_blacklisted_driver(self):
+		if self.driver and frappe.db.get_value("Driver", self.driver, "is_blacklisted"):
+			frappe.throw(_("Driver {0} is blacklisted and cannot be assigned to a Trip.").format(self.driver))
 
 	def set_assigned(self):
 		"""Driver & Vehicle Assignment (doc section 8) is a distinct step after
@@ -159,7 +164,7 @@ def get_available_drivers(doctype, txt, searchfield, start, page_len, filters=No
 		pluck="driver",
 	)
 
-	driver_filters = {"status": "Active", searchfield: ("like", f"%{txt}%")}
+	driver_filters = {"status": "Active", "is_blacklisted": 0, searchfield: ("like", f"%{txt}%")}
 	if booked:
 		driver_filters["name"] = ("not in", booked)
 

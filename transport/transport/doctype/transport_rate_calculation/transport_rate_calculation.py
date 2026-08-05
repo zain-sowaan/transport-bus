@@ -11,6 +11,7 @@ COST_COMPONENTS = (
 	"fuel_cost",
 	"salik_toll_parking_cost",
 	"driver_salary_cost",
+	"room_rent_cost",
 	"maintenance_cost",
 )
 
@@ -26,6 +27,7 @@ class TransportRateCalculation(Document):
 			self.fuel_cost = 0
 		if self.with_driver != "With Driver":
 			self.driver_salary_cost = 0
+			self.room_rent_cost = 0
 
 		self.total_estimated_cost = sum(flt(self.get(f)) for f in COST_COMPONENTS)
 		self.cost_per_trip = (

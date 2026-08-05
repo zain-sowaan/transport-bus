@@ -1,0 +1,208 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-FB-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 17:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "trip_section",
+  "trip",
+  "driver",
+  "column_break_trip",
+  "project",
+  "feedback_from",
+  "ratings_section",
+  "driver_behaviour",
+  "driving_quality",
+  "vehicle_condition",
+  "column_break_ratings",
+  "vehicle_cleanliness",
+  "driver_hygiene",
+  "timing_punctuality",
+  "overall_section",
+  "overall_rating",
+  "column_break_overall",
+  "escalated",
+  "escalated_on",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "trip_section",
+   "fieldtype": "Section Break",
+   "label": "Trip"
+  },
+  {
+   "fieldname": "trip",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Trip",
+   "options": "Trip",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "trip.driver",
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_trip",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "trip.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fieldname": "feedback_from",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Feedback From",
+   "options": "Customer\nIn-Charge\nAdmin/HR",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ratings_section",
+   "fieldtype": "Section Break",
+   "label": "Ratings (1-5)"
+  },
+  {
+   "fieldname": "driver_behaviour",
+   "fieldtype": "Int",
+   "label": "Driver Behaviour",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "driving_quality",
+   "fieldtype": "Int",
+   "label": "Driving Quality",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle_condition",
+   "fieldtype": "Int",
+   "label": "Vehicle Condition",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ratings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vehicle_cleanliness",
+   "fieldtype": "Int",
+   "label": "Vehicle Cleanliness",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "driver_hygiene",
+   "fieldtype": "Int",
+   "label": "Driver Hygiene",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "timing_punctuality",
+   "fieldtype": "Int",
+   "label": "Timing and Punctuality",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "overall_section",
+   "fieldtype": "Section Break",
+   "label": "Overall"
+  },
+  {
+   "fieldname": "overall_rating",
+   "fieldtype": "Float",
+   "label": "Overall Rating (out of 5)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_overall",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "escalated",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Escalated to Management",
+   "read_only": 1
+  },
+  {
+   "fieldname": "escalated_on",
+   "fieldtype": "Datetime",
+   "label": "Escalated On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Trip Feedback",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport In-Charge"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "trip",
+ "track_changes": 1
+}

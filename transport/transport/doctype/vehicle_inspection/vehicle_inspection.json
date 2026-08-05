@@ -1,0 +1,224 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-VI-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 17:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "details_section",
+  "project",
+  "vehicle",
+  "column_break_details",
+  "inspection_type",
+  "inspection_date",
+  "inspected_by",
+  "condition_section",
+  "odometer_reading",
+  "fuel_level",
+  "mulkiya_present",
+  "column_break_condition",
+  "tools_accessories_present",
+  "lights_indicators_ok",
+  "condition2_section",
+  "exterior_condition",
+  "interior_condition",
+  "column_break_condition2",
+  "tyre_condition",
+  "battery_condition",
+  "photo_section",
+  "photo",
+  "damages_remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Vehicle",
+   "options": "Rental Vehicle",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "inspection_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Inspection Type",
+   "options": "Check-In\nCheck-Out",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "inspection_date",
+   "fieldtype": "Date",
+   "label": "Inspection Date",
+   "reqd": 1
+  },
+  {
+   "default": "__user",
+   "fieldname": "inspected_by",
+   "fieldtype": "Link",
+   "label": "Inspected By",
+   "options": "User"
+  },
+  {
+   "fieldname": "condition_section",
+   "fieldtype": "Section Break",
+   "label": "Checklist"
+  },
+  {
+   "fieldname": "odometer_reading",
+   "fieldtype": "Float",
+   "label": "Odometer Reading (KM)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fuel_level",
+   "fieldtype": "Select",
+   "label": "Fuel Level",
+   "options": "Full\n3/4\nHalf\n1/4\nReserve/Empty",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "mulkiya_present",
+   "fieldtype": "Check",
+   "label": "Vehicle Documents Present (Mulkiya)"
+  },
+  {
+   "fieldname": "column_break_condition",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "tools_accessories_present",
+   "fieldtype": "Check",
+   "label": "Tools & Accessories Present"
+  },
+  {
+   "default": "1",
+   "fieldname": "lights_indicators_ok",
+   "fieldtype": "Check",
+   "label": "Lights & Indicators Functional"
+  },
+  {
+   "fieldname": "condition2_section",
+   "fieldtype": "Section Break",
+   "label": "Condition"
+  },
+  {
+   "default": "Good",
+   "fieldname": "exterior_condition",
+   "fieldtype": "Select",
+   "label": "Exterior Condition",
+   "options": "Good\nFair\nPoor",
+   "reqd": 1
+  },
+  {
+   "default": "Good",
+   "fieldname": "interior_condition",
+   "fieldtype": "Select",
+   "label": "Interior Condition",
+   "options": "Good\nFair\nPoor",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_condition2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Good",
+   "fieldname": "tyre_condition",
+   "fieldtype": "Select",
+   "label": "Tyre Condition",
+   "options": "Good\nFair\nPoor",
+   "reqd": 1
+  },
+  {
+   "default": "Good",
+   "fieldname": "battery_condition",
+   "fieldtype": "Select",
+   "label": "Battery Condition",
+   "options": "Good\nFair\nPoor",
+   "reqd": 1
+  },
+  {
+   "fieldname": "photo_section",
+   "fieldtype": "Section Break",
+   "label": "Photo & Remarks"
+  },
+  {
+   "description": "Representative vehicle photo - attach additional angles via the standard attachment sidebar.",
+   "fieldname": "photo",
+   "fieldtype": "Attach Image",
+   "label": "Vehicle Photo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "damages_remarks",
+   "fieldtype": "Small Text",
+   "label": "Damages / Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Vehicle Inspection",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport In-Charge"
+  }
+ ],
+ "sort_field": "inspection_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "vehicle",
+ "track_changes": 1
+}

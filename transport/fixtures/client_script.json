@@ -2,6 +2,17 @@
  {
   "docstatus": 0,
   "doctype": "Client Script",
+  "dt": "Driver",
+  "enabled": 1,
+  "modified": "2026-08-05 18:06:46.947784",
+  "module": "Transport",
+  "name": "Driver-transport-blacklist",
+  "script": "frappe.ui.form.on(\"Driver\", {\n\trefresh(frm) {\n\t\tif (frm.is_new()) {\n\t\t\treturn;\n\t\t}\n\n\t\tif (!frm.doc.is_blacklisted) {\n\t\t\tfrm.add_custom_button(__(\"Blacklist Driver\"), () => {\n\t\t\t\tfrappe.prompt(\n\t\t\t\t\t{ fieldname: \"reason\", fieldtype: \"Small Text\", label: __(\"Reason\"), reqd: 1 },\n\t\t\t\t\t(values) => {\n\t\t\t\t\t\tfrappe.call({\n\t\t\t\t\t\t\tmethod: \"transport.transport.doctype.driver_incident.driver_incident.set_driver_blacklist\",\n\t\t\t\t\t\t\targs: { driver: frm.doc.name, blacklisted: 1, reason: values.reason },\n\t\t\t\t\t\t\tcallback: () => frm.reload_doc(),\n\t\t\t\t\t\t});\n\t\t\t\t\t},\n\t\t\t\t\t__(\"Blacklist Driver\")\n\t\t\t\t);\n\t\t\t}, __(\"Transport\"));\n\t\t} else {\n\t\t\tfrm.add_custom_button(__(\"Clear Blacklist\"), () => {\n\t\t\t\tfrappe.call({\n\t\t\t\t\tmethod: \"transport.transport.doctype.driver_incident.driver_incident.set_driver_blacklist\",\n\t\t\t\t\targs: { driver: frm.doc.name, blacklisted: 0 },\n\t\t\t\t\tcallback: () => frm.reload_doc(),\n\t\t\t\t});\n\t\t\t}, __(\"Transport\"));\n\t\t}\n\t},\n});",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
   "dt": "Sales Invoice",
   "enabled": 1,
   "modified": "2026-08-05 17:07:17.587116",

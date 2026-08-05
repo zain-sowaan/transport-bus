@@ -1,0 +1,243 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-TF-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 17:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "fine_section",
+  "trip",
+  "driver",
+  "vehicle",
+  "column_break_fine",
+  "project",
+  "date_time",
+  "ticket_number",
+  "detail_section",
+  "fine_type",
+  "fine_location",
+  "column_break_detail",
+  "description",
+  "attachment",
+  "amount_section",
+  "amount",
+  "add_vat",
+  "vat_amount",
+  "column_break_amount",
+  "total_cost",
+  "responsibility",
+  "status_section",
+  "status",
+  "column_break_status",
+  "black_points_applied",
+  "driver_incident"
+ ],
+ "fields": [
+  {
+   "fieldname": "fine_section",
+   "fieldtype": "Section Break",
+   "label": "Fine"
+  },
+  {
+   "fieldname": "trip",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Trip",
+   "options": "Trip"
+  },
+  {
+   "fetch_from": "trip.driver",
+   "fetch_if_empty": 1,
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver"
+  },
+  {
+   "fetch_from": "trip.vehicle",
+   "fetch_if_empty": 1,
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vehicle",
+   "options": "Rental Vehicle"
+  },
+  {
+   "fieldname": "column_break_fine",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "trip.project",
+   "fetch_if_empty": 1,
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "date_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Date/Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ticket_number",
+   "fieldtype": "Data",
+   "label": "Ticket Number"
+  },
+  {
+   "fieldname": "detail_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "fine_type",
+   "fieldtype": "Data",
+   "label": "Fine Type"
+  },
+  {
+   "fieldname": "fine_location",
+   "fieldtype": "Data",
+   "label": "Fine Location"
+  },
+  {
+   "fieldname": "column_break_detail",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "attachment",
+   "fieldtype": "Attach",
+   "label": "Attachment"
+  },
+  {
+   "fieldname": "amount_section",
+   "fieldtype": "Section Break",
+   "label": "Amount"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Fine Amount",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "add_vat",
+   "fieldtype": "Check",
+   "label": "Add VAT?"
+  },
+  {
+   "fieldname": "vat_amount",
+   "fieldtype": "Currency",
+   "label": "5% VAT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_amount",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_cost",
+   "fieldtype": "Currency",
+   "label": "Total Cost with VAT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "responsibility",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Responsibility",
+   "options": "Driver\nCompany\nCustomer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Unpaid",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Unpaid\nPaid\nDisputed\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Set once this fine has auto-created a Driver Incident (Driver responsibility + Paid) - prevents double-counting black points.",
+   "fieldname": "black_points_applied",
+   "fieldtype": "Check",
+   "label": "Black Points Applied",
+   "read_only": 1
+  },
+  {
+   "fieldname": "driver_incident",
+   "fieldtype": "Link",
+   "label": "Driver Incident",
+   "options": "Driver Incident",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Transport Traffic Fine",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Accounts",
+   "write": 1
+  }
+ ],
+ "sort_field": "date_time",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "ticket_number",
+ "track_changes": 1
+}

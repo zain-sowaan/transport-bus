@@ -22,7 +22,12 @@
   "enforce_minimum_margin",
   "default_minimum_margin_percent",
   "billing_section",
-  "transport_service_item"
+  "transport_service_item",
+  "quality_section",
+  "feedback_escalation_rating",
+  "blacklist_threshold_points",
+  "column_break_quality",
+  "black_points_per_fine"
  ],
  "fields": [
   {
@@ -154,6 +159,42 @@
    "fieldtype": "Link",
    "label": "Transport Service Item",
    "options": "Item"
+  },
+  {
+   "fieldname": "quality_section",
+   "fieldtype": "Section Break",
+   "label": "Quality & Compliance"
+  },
+  {
+   "default": "2.5",
+   "description": "A Trip Feedback with Overall Rating below this (out of 5) auto-escalates to management.",
+   "fieldname": "feedback_escalation_rating",
+   "fieldtype": "Float",
+   "label": "Feedback Escalation Threshold (out of 5)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "10",
+   "description": "A Driver is auto-blacklisted once their total black points (incidents + fines) reach this.",
+   "fieldname": "blacklist_threshold_points",
+   "fieldtype": "Int",
+   "label": "Blacklist Threshold (Black Points)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_quality",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "2",
+   "description": "Black points auto-added to a driver's Driver Incident record when a Traffic Fine's responsibility is set to Driver.",
+   "fieldname": "black_points_per_fine",
+   "fieldtype": "Int",
+   "label": "Black Points per Fine (Driver Responsibility)",
+   "non_negative": 1,
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
