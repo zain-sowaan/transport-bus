@@ -1,0 +1,173 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-EXP-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 15:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "trip",
+  "driver",
+  "column_break_trip",
+  "project",
+  "expense_date",
+  "detail_section",
+  "expense_type",
+  "amount",
+  "column_break_detail",
+  "attachment",
+  "remarks",
+  "approval_section",
+  "status",
+  "column_break_approval",
+  "approved_by",
+  "approved_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "trip",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Trip",
+   "options": "Trip",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "trip.driver",
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_trip",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "trip.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "expense_date",
+   "fieldtype": "Date",
+   "label": "Expense Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "detail_section",
+   "fieldtype": "Section Break",
+   "label": "Detail"
+  },
+  {
+   "fieldname": "expense_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Expense Type",
+   "options": "Fuel\nSalik / Toll\nParking\nMaintenance\nOthers",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_detail",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Photo of the receipt.",
+   "fieldname": "attachment",
+   "fieldtype": "Attach Image",
+   "label": "Receipt",
+   "reqd": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nApproved\nRejected",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Trip Expense",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Transport Driver"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "expense_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "trip",
+ "track_changes": 1
+}

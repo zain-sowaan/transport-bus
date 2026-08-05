@@ -110,7 +110,7 @@ def get_trips_by_date(project, from_date, to_date):
 			"trip_date": ("between", [from_date, to_date]),
 			"status": ("not in", ["Rejected", "Cancelled"]),
 		},
-		fields=["trip_date", "route", "direction", "scheduled_time", "actual_pickup_time", "actual_drop_time", "is_additional", "status"],
+		fields=["trip_date", "route", "direction", "scheduled_time", "actual_start_time", "is_additional", "status"],
 	)
 
 	by_date = {}
@@ -120,13 +120,12 @@ def get_trips_by_date(project, from_date, to_date):
 
 
 def format_time(trip):
-	# actual_pickup_time/actual_drop_time are Time fields Frappe silently
-	# fills with the current wall-clock time on insert (see
-	# reference_frappe_time_field_autofill) - they're only meaningful once a
-	# driver has actually recorded them, which "status" tells us, not the
+	# actual_start_time is a Time field Frappe silently fills with the
+	# current wall-clock time on insert (see
+	# reference_frappe_time_field_autofill) - it's only meaningful once a
+	# driver has actually started the leg, which "status" tells us, not the
 	# field's own truthiness.
 	value = trip.scheduled_time
-	if trip.status in ("Completed", "Approved"):
-		actual = trip.actual_pickup_time if trip.direction == "Pickup" else trip.actual_drop_time
-		value = actual or value
+	if trip.status in ("Started", "Completed", "Approved") and trip.actual_start_time:
+		value = trip.actual_start_time
 	return frappe.utils.format_time(value, "hh:mm a") if value else ""

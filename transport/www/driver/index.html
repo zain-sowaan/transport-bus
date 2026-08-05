@@ -1,0 +1,43 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="driver-app">
+	<h2>My Trips</h2>
+
+	{% if error %}
+		<p class="text-muted">{{ error }}</p>
+	{% elif not trips %}
+		<p class="text-muted">No trips scheduled in the next 7 days.</p>
+	{% else %}
+		<div class="trip-list">
+			{% for trip in trips %}
+			<a class="trip-card status-{{ trip.status.lower().replace(' ', '-') }}" href="/driver/trip?name={{ trip.name }}">
+				<div class="trip-card-top">
+					<span class="trip-date">{{ frappe.utils.formatdate(trip.trip_date) }} &middot; {{ trip.scheduled_time }}</span>
+					<span class="trip-status">{{ trip.status }}{% if trip.needs_reallocation %} &middot; Needs Reallocation{% endif %}</span>
+				</div>
+				<div class="trip-card-route">{{ trip.from_place }} &rarr; {{ trip.to_place }}</div>
+				<div class="trip-card-meta">{{ trip.direction }}{% if trip.vehicle %} &middot; {{ trip.vehicle }}{% endif %}</div>
+			</a>
+			{% endfor %}
+		</div>
+	{% endif %}
+</div>
+
+<style>
+	.driver-app { max-width: 480px; margin: 0 auto; padding: 12px; }
+	.trip-list { display: flex; flex-direction: column; gap: 10px; }
+	.trip-card {
+		display: block; border: 1px solid #d1d8dd; border-radius: 8px; padding: 12px 14px;
+		text-decoration: none; color: inherit; border-left: 4px solid #8d99a6;
+	}
+	.trip-card.status-assigned { border-left-color: #f0a400; }
+	.trip-card.status-accepted { border-left-color: #2e7d32; }
+	.trip-card.status-started { border-left-color: #1976d2; }
+	.trip-card.status-completed, .trip-card.status-approved { border-left-color: #5e35b1; }
+	.trip-card.status-rejected, .trip-card.status-cancelled { border-left-color: #c62828; opacity: 0.7; }
+	.trip-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #6c7680; margin-bottom: 6px; }
+	.trip-card-route { font-weight: 600; }
+	.trip-card-meta { font-size: 13px; color: #6c7680; margin-top: 4px; }
+</style>
+{% endblock %}

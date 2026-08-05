@@ -1,0 +1,41 @@
+[
+ {
+  "desk_access": 0,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-08-05 15:06:16.854810",
+  "name": "Transport Driver",
+  "restrict_to_domain": null,
+  "role_name": "Transport Driver",
+  "two_factor_auth": 0
+ },
+ {
+  "desk_access": 1,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-08-05 15:03:50.626943",
+  "name": "Transport Operations",
+  "restrict_to_domain": null,
+  "role_name": "Transport Operations",
+  "two_factor_auth": 0
+ },
+ {
+  "desk_access": 1,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-08-05 15:03:50.906167",
+  "name": "Transport In-Charge",
+  "restrict_to_domain": null,
+  "role_name": "Transport In-Charge",
+  "two_factor_auth": 0
+ }
+]

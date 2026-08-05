@@ -22,18 +22,29 @@
   "trip_date",
   "scheduled_time",
   "column_break_timing",
-  "actual_pickup_time",
-  "actual_drop_time",
+  "actual_start_time",
+  "actual_end_time",
   "assignment_section",
   "vehicle",
   "vehicle_class",
   "column_break_assignment",
   "driver",
   "duty_type",
+  "assigned_on",
   "status_section",
   "status",
+  "needs_reallocation",
+  "rejection_reason",
+  "reminder_sent",
+  "execution_section",
+  "start_odometer",
+  "vehicle_photo",
+  "column_break_execution",
+  "end_odometer",
+  "drop_photo",
   "remarks_section",
-  "remarks"
+  "remarks",
+  "driver_remarks"
  ],
  "fields": [
   {
@@ -143,15 +154,17 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "actual_pickup_time",
+   "description": "When the driver actually started this leg (set by Start Trip, regardless of Pickup/Drop direction).",
+   "fieldname": "actual_start_time",
    "fieldtype": "Time",
-   "label": "Actual Pickup Time",
+   "label": "Actual Start Time",
    "read_only": 1
   },
   {
-   "fieldname": "actual_drop_time",
+   "description": "When the driver actually completed this leg (set by End Trip).",
+   "fieldname": "actual_end_time",
    "fieldtype": "Time",
-   "label": "Actual Drop Time",
+   "label": "Actual End Time",
    "read_only": 1
   },
   {
@@ -196,6 +209,13 @@
    "read_only": 1
   },
   {
+   "description": "Set the moment both Vehicle and Driver are assigned - drives the driver-confirmation escalation window.",
+   "fieldname": "assigned_on",
+   "fieldtype": "Datetime",
+   "label": "Assigned On",
+   "read_only": 1
+  },
+  {
    "fieldname": "status_section",
    "fieldtype": "Section Break",
    "label": "Status"
@@ -211,6 +231,66 @@
    "reqd": 1
   },
   {
+   "default": "0",
+   "description": "Set when a driver rejects the trip or fails to confirm in time - clear once reassigned.",
+   "fieldname": "needs_reallocation",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Needs Reallocation",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.status=='Rejected'",
+   "fieldname": "rejection_reason",
+   "fieldtype": "Small Text",
+   "label": "Rejection Reason",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "reminder_sent",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Reminder Sent",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "execution_section",
+   "fieldtype": "Section Break",
+   "label": "Execution"
+  },
+  {
+   "fieldname": "start_odometer",
+   "fieldtype": "Float",
+   "label": "Start Odometer (KM)",
+   "read_only": 1
+  },
+  {
+   "description": "Captured by the driver at trip start, within the pickup location's geofence.",
+   "fieldname": "vehicle_photo",
+   "fieldtype": "Attach Image",
+   "label": "Vehicle Photo (Start)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_execution",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "end_odometer",
+   "fieldtype": "Float",
+   "label": "End Odometer (KM)",
+   "read_only": 1
+  },
+  {
+   "description": "Captured by the driver at trip end, at the drop location.",
+   "fieldname": "drop_photo",
+   "fieldtype": "Attach Image",
+   "label": "Drop Photo (End)",
+   "read_only": 1
+  },
+  {
    "fieldname": "remarks_section",
    "fieldtype": "Section Break",
    "label": "Remarks"
@@ -218,7 +298,13 @@
   {
    "fieldname": "remarks",
    "fieldtype": "Small Text",
-   "label": "Remarks"
+   "label": "Remarks (Office)"
+  },
+  {
+   "fieldname": "driver_remarks",
+   "fieldtype": "Small Text",
+   "label": "Driver Remarks",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -241,6 +327,24 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport In-Charge",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Transport Driver"
   }
  ],
  "row_format": "Dynamic",

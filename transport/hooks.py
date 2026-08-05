@@ -15,7 +15,11 @@ fixtures = [
 	{
 		"doctype": "Custom Field",
 		"filters": {"module": "Transport"},
-	}
+	},
+	{
+		"doctype": "Role",
+		"filters": [["role_name", "in", ["Transport Driver", "Transport In-Charge", "Transport Operations"]]],
+	},
 ]
 
 # Apps
@@ -165,6 +169,15 @@ scheduler_events = {
 	"daily": [
 		"transport.transport.doctype.compliance_document.compliance_document.refresh_status"
 	],
+	"cron": {
+		# Every 5 minutes: fine enough granularity for a 20-min trip reminder
+		# and a 5-min driver-confirmation escalation window without being a
+		# noisy background job.
+		"*/5 * * * *": [
+			"transport.transport.driver_portal.send_trip_reminders",
+			"transport.transport.driver_portal.escalate_unconfirmed_trips",
+		],
+	},
 }
 
 # Document Events
@@ -176,6 +189,19 @@ scheduler_events = {
 doc_events = {
 	"Opportunity": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
 	"Quotation": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
+}
+
+# Permissions
+# -----------
+# A driver's user only ever sees their own Trips - every state change goes
+# through a whitelisted method in driver_portal.py instead of a raw save.
+
+permission_query_conditions = {
+	"Trip": "transport.transport.driver_portal.get_permission_query_conditions",
+}
+
+has_permission = {
+	"Trip": "transport.transport.driver_portal.has_permission",
 }
 
 # Testing

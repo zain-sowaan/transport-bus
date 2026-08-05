@@ -1,0 +1,231 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="driver-app">
+	{% if error %}
+		<p class="text-muted">{{ error }}</p>
+	{% else %}
+		<a href="/driver" class="back-link">&larr; My Trips</a>
+		<h2>{{ trip.from_place }} &rarr; {{ trip.to_place }}</h2>
+		<p class="trip-meta">
+			{{ frappe.utils.formatdate(trip.trip_date) }} &middot; {{ trip.scheduled_time }} &middot; {{ trip.direction }}
+			{% if trip.vehicle %} &middot; {{ trip.vehicle }}{% endif %}
+		</p>
+		<p class="trip-status">Status: <b id="trip-status">{{ trip.status }}</b></p>
+		{% if trip.rejection_reason %}<p class="text-muted">Rejected: {{ trip.rejection_reason }}</p>{% endif %}
+
+		<div id="action-area" data-trip="{{ trip.name }}" data-status="{{ trip.status }}"></div>
+
+		<div id="expense-area">
+			<h3>Log an Expense</h3>
+			<div class="field"><label>Type</label>
+				<select id="expense-type">
+					<option>Fuel</option><option>Salik / Toll</option><option>Parking</option>
+					<option>Maintenance</option><option>Others</option>
+				</select>
+			</div>
+			<div class="field"><label>Amount</label><input type="number" id="expense-amount" min="0" step="0.01"></div>
+			<div class="field"><label>Receipt Photo</label><input type="file" id="expense-photo" accept="image/*" capture="environment"></div>
+			<div class="field"><label>Remarks</label><input type="text" id="expense-remarks"></div>
+			<button class="btn btn-default" id="log-expense-btn">Submit Expense</button>
+			<p id="expense-message" class="text-muted"></p>
+		</div>
+	{% endif %}
+</div>
+
+<style>
+	.driver-app { max-width: 480px; margin: 0 auto; padding: 12px; }
+	.back-link { display: inline-block; margin-bottom: 10px; }
+	.trip-meta, .trip-status { color: #6c7680; margin: 4px 0; }
+	.field { margin-bottom: 10px; }
+	.field label { display: block; font-size: 12px; color: #6c7680; margin-bottom: 3px; }
+	.field input, .field select { width: 100%; padding: 8px; border: 1px solid #d1d8dd; border-radius: 6px; }
+	.btn { display: inline-block; padding: 10px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; margin: 4px 4px 4px 0; }
+	.btn-primary { background: #2e7d32; color: #fff; }
+	.btn-danger { background: #c62828; color: #fff; }
+	.btn-info { background: #1976d2; color: #fff; }
+	.btn-default { background: #eceff1; color: #333; }
+	#action-area { margin: 16px 0; }
+	#expense-area { margin-top: 24px; border-top: 1px solid #d1d8dd; padding-top: 16px; }
+	.msg-error { color: #c62828; }
+	.msg-ok { color: #2e7d32; }
+</style>
+
+<script>
+frappe.ready(function() {
+	var actionArea = document.getElementById("action-area");
+	if (!actionArea) return;
+
+	var tripName = actionArea.dataset.trip;
+	var status = actionArea.dataset.status;
+
+	function uploadFile(fileInput) {
+		return new Promise(function(resolve, reject) {
+			if (!fileInput.files.length) { reject("No file selected"); return; }
+			var formData = new FormData();
+			formData.append("file", fileInput.files[0]);
+			formData.append("is_private", 1);
+			fetch("/api/method/upload_file", {
+				method: "POST",
+				headers: { "X-Frappe-CSRF-Token": frappe.csrf_token },
+				body: formData,
+				credentials: "include",
+			})
+				.then(function(r) { return r.json(); })
+				.then(function(data) {
+					if (data.message && data.message.file_url) resolve(data.message.file_url);
+					else reject("Upload failed");
+				})
+				.catch(reject);
+		});
+	}
+
+	function getPosition() {
+		return new Promise(function(resolve, reject) {
+			if (!navigator.geolocation) { reject("Geolocation is not available on this device."); return; }
+			navigator.geolocation.getCurrentPosition(
+				function(pos) { resolve(pos.coords); },
+				function() { reject("Could not get your location. Enable location access and try again."); },
+				{ enableHighAccuracy: true, timeout: 15000 }
+			);
+		});
+	}
+
+	function callMethod(method, args) {
+		return new Promise(function(resolve, reject) {
+			frappe.call({
+				method: "transport.transport.driver_portal." + method,
+				args: args,
+				callback: function(r) { resolve(r.message); },
+				error: function(r) { reject((r && r._server_messages) || "Something went wrong."); },
+			});
+		});
+	}
+
+	function reload() { window.location.reload(); }
+
+	function render() {
+		actionArea.innerHTML = "";
+
+		if (status === "Assigned") {
+			var accept = button("Accept Trip", "btn-primary");
+			var reject = button("Reject Trip", "btn-danger");
+			accept.onclick = function() {
+				callMethod("accept_trip", { trip_name: tripName }).then(reload);
+			};
+			reject.onclick = function() {
+				var reason = prompt("Reason for rejecting this trip:");
+				if (reason) callMethod("reject_trip", { trip_name: tripName, reason: reason }).then(reload);
+			};
+			actionArea.appendChild(accept);
+			actionArea.appendChild(reject);
+		} else if (status === "Accepted") {
+			var photoLabel = document.createElement("div");
+			photoLabel.className = "field";
+			photoLabel.innerHTML = '<label>Vehicle Photo</label><input type="file" id="start-photo" accept="image/*" capture="environment">';
+			var odoLabel = document.createElement("div");
+			odoLabel.className = "field";
+			odoLabel.innerHTML = '<label>Start Odometer (KM)</label><input type="number" id="start-odo">';
+			var start = button("Start Trip", "btn-info");
+			start.onclick = function() {
+				var photoInput = document.getElementById("start-photo");
+				start.disabled = true;
+				getPosition()
+					.then(function(coords) {
+						return uploadFile(photoInput).then(function(fileUrl) {
+							return callMethod("start_trip", {
+								trip_name: tripName,
+								latitude: coords.latitude,
+								longitude: coords.longitude,
+								vehicle_photo: fileUrl,
+								start_odometer: document.getElementById("start-odo").value || null,
+							});
+						});
+					})
+					.then(reload)
+					.catch(function(e) { alert(e); start.disabled = false; });
+			};
+			actionArea.appendChild(photoLabel);
+			actionArea.appendChild(odoLabel);
+			actionArea.appendChild(start);
+		} else if (status === "Started") {
+			var dropLabel = document.createElement("div");
+			dropLabel.className = "field";
+			dropLabel.innerHTML = '<label>Drop Location Photo</label><input type="file" id="end-photo" accept="image/*" capture="environment">';
+			var endOdoLabel = document.createElement("div");
+			endOdoLabel.className = "field";
+			endOdoLabel.innerHTML = '<label>End Odometer (KM)</label><input type="number" id="end-odo">';
+			var remarksLabel = document.createElement("div");
+			remarksLabel.className = "field";
+			remarksLabel.innerHTML = '<label>Remarks</label><input type="text" id="end-remarks">';
+			var end = button("End Trip", "btn-primary");
+			end.onclick = function() {
+				var photoInput = document.getElementById("end-photo");
+				end.disabled = true;
+				uploadFile(photoInput)
+					.then(function(fileUrl) {
+						return callMethod("end_trip", {
+							trip_name: tripName,
+							drop_photo: fileUrl,
+							end_odometer: document.getElementById("end-odo").value || null,
+							driver_remarks: document.getElementById("end-remarks").value || null,
+						});
+					})
+					.then(reload)
+					.catch(function(e) { alert(e); end.disabled = false; });
+			};
+			actionArea.appendChild(dropLabel);
+			actionArea.appendChild(endOdoLabel);
+			actionArea.appendChild(remarksLabel);
+			actionArea.appendChild(end);
+		} else {
+			var done = document.createElement("p");
+			done.className = "text-muted";
+			done.textContent = "No action needed right now.";
+			actionArea.appendChild(done);
+		}
+	}
+
+	function button(label, cls) {
+		var b = document.createElement("button");
+		b.className = "btn " + cls;
+		b.textContent = label;
+		return b;
+	}
+
+	render();
+
+	var logExpenseBtn = document.getElementById("log-expense-btn");
+	logExpenseBtn.onclick = function() {
+		var photoInput = document.getElementById("expense-photo");
+		var msg = document.getElementById("expense-message");
+		var amount = document.getElementById("expense-amount").value;
+		if (!amount || !photoInput.files.length) {
+			msg.className = "msg-error";
+			msg.textContent = "Amount and a receipt photo are required.";
+			return;
+		}
+		logExpenseBtn.disabled = true;
+		uploadFile(photoInput)
+			.then(function(fileUrl) {
+				return callMethod("log_expense", {
+					trip_name: tripName,
+					expense_type: document.getElementById("expense-type").value,
+					amount: amount,
+					attachment: fileUrl,
+					remarks: document.getElementById("expense-remarks").value || null,
+				});
+			})
+			.then(function() {
+				msg.className = "msg-ok";
+				msg.textContent = "Expense submitted for approval.";
+			})
+			.catch(function(e) {
+				msg.className = "msg-error";
+				msg.textContent = e;
+				logExpenseBtn.disabled = false;
+			});
+	};
+});
+</script>
+{% endblock %}

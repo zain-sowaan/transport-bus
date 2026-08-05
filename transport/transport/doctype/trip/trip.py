@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import now_datetime
 
 LMV_LABEL = "LMV (Light Motor Vehicle)"
 HMV_LABEL = "HMV (Heavy Motor Vehicle)"
@@ -14,6 +15,17 @@ class Trip(Document):
 		self.set_route_endpoints()
 		self.check_double_booking()
 		self.set_duty_type()
+		self.set_assigned()
+
+	def set_assigned(self):
+		"""Driver & Vehicle Assignment (doc section 8) is a distinct step after
+		Trip Planning (section 7): a Trip starts Draft and only becomes
+		Assigned once both are set, which also starts the driver-confirmation
+		escalation clock."""
+		if self.status == "Draft" and self.vehicle and self.driver:
+			self.status = "Assigned"
+			self.assigned_on = now_datetime()
+			self.reminder_sent = 0
 
 	def set_route_endpoints(self):
 		"""Fill from_place/to_place from the Route when creating a Trip by hand
