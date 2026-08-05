@@ -1,14 +1,27 @@
 app_name = "transport"
-app_title = "Transport"
+app_title = "Sowaan Transport"
 app_publisher = "M. Zain Ul Abideen"
 app_description = "This app is used to account the transport system of a company, and it requires fleetify app to work"
 app_email = "m.zain00727@gmail.com"
 app_license = "mit"
 
+# Fixtures
+# --------
+# Custom Fields on Rental Vehicle (fleetify) are shipped here rather than
+# edited directly on fleetify's own doctype JSON, so they only land on sites
+# where this app is installed.
+
+fixtures = [
+	{
+		"doctype": "Custom Field",
+		"filters": {"module": "Transport"},
+	}
+]
+
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["fleetify"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -148,23 +161,22 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"transport.tasks.all"
-# 	],
-# 	"daily": [
-# 		"transport.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"transport.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"transport.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"transport.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"transport.transport.doctype.compliance_document.compliance_document.refresh_status"
+	],
+}
+
+# Document Events
+# ---------------
+# `lost_reasons` already exists natively on Opportunity and Quotation, but
+# only `declare_enquiry_lost` enforces it — a plain save with status=Lost
+# does not. This makes it mandatory, per the source document.
+
+doc_events = {
+	"Opportunity": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
+	"Quotation": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
+}
 
 # Testing
 # -------

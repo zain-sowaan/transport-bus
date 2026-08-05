@@ -1,0 +1,184 @@
+{
+ "actions": [],
+ "creation": "2026-08-05 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "trip_limits_section",
+  "lmv_daily_trip_limit",
+  "hmv_daily_trip_limit",
+  "column_break_limits",
+  "fatigue_max_driving_hours",
+  "confirmation_section",
+  "trip_alert_lead_minutes",
+  "driver_confirmation_window_minutes",
+  "compliance_section",
+  "service_interval_km_first",
+  "service_interval_km_second",
+  "column_break_compliance",
+  "compliance_expiry_soon_days",
+  "contract_expiry_alert_days",
+  "pricing_section",
+  "enforce_minimum_margin",
+  "default_minimum_margin_percent",
+  "billing_section",
+  "transport_service_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "trip_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Trip Limits"
+  },
+  {
+   "default": "5",
+   "description": "Light Motor Vehicle: maximum trips per day before extra legs count as Overtime.",
+   "fieldname": "lmv_daily_trip_limit",
+   "fieldtype": "Int",
+   "label": "LMV Daily Trip Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "4",
+   "description": "Heavy Motor Vehicle: maximum trips per day before extra legs count as Overtime.",
+   "fieldname": "hmv_daily_trip_limit",
+   "fieldtype": "Int",
+   "label": "HMV Daily Trip Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "12",
+   "description": "Alert Operations if a driver's trips for the day exceed this many driving hours.",
+   "fieldname": "fatigue_max_driving_hours",
+   "fieldtype": "Float",
+   "label": "Fatigue Alert - Max Driving Hours/Day",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "confirmation_section",
+   "fieldtype": "Section Break",
+   "label": "Trip Confirmation"
+  },
+  {
+   "default": "20",
+   "description": "Send the driver a trip reminder this many minutes before the scheduled pickup.",
+   "fieldname": "trip_alert_lead_minutes",
+   "fieldtype": "Int",
+   "label": "Trip Alert Lead Time (Minutes)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "description": "If the driver has not accepted the trip within this window, escalate to In-charge and Operations.",
+   "fieldname": "driver_confirmation_window_minutes",
+   "fieldtype": "Int",
+   "label": "Driver Confirmation Window (Minutes)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "compliance_section",
+   "fieldtype": "Section Break",
+   "label": "Service & Compliance"
+  },
+  {
+   "default": "5000",
+   "fieldname": "service_interval_km_first",
+   "fieldtype": "Int",
+   "label": "Service Reminder - First Interval (KM)",
+   "non_negative": 1
+  },
+  {
+   "default": "10000",
+   "fieldname": "service_interval_km_second",
+   "fieldtype": "Int",
+   "label": "Service Reminder - Second Interval (KM)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_compliance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "30",
+   "description": "A Compliance Document is flagged \"Expiring Soon\" once its expiry date is within this many days.",
+   "fieldname": "compliance_expiry_soon_days",
+   "fieldtype": "Int",
+   "label": "Compliance \"Expiring Soon\" Window (Days)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "description": "Customer LPO / agreement expiry alert lead time.",
+   "fieldname": "contract_expiry_alert_days",
+   "fieldtype": "Int",
+   "label": "Contract Expiry Alert (Days)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing Controls"
+  },
+  {
+   "default": "1",
+   "description": "Block quotations priced below the calculated cost.",
+   "fieldname": "enforce_minimum_margin",
+   "fieldtype": "Check",
+   "label": "Enforce Minimum Margin"
+  },
+  {
+   "depends_on": "eval:doc.enforce_minimum_margin",
+   "description": "Default minimum margin used by Transport Rate Calculation when a Quotation does not specify its own.",
+   "fieldname": "default_minimum_margin_percent",
+   "fieldtype": "Percent",
+   "label": "Default Minimum Margin %"
+  },
+  {
+   "fieldname": "billing_section",
+   "fieldtype": "Section Break",
+   "label": "Billing"
+  },
+  {
+   "description": "Item used for the vehicle-rental line when a Transport Rate Calculation creates its Quotation.",
+   "fieldname": "transport_service_item",
+   "fieldtype": "Link",
+   "label": "Transport Service Item",
+   "options": "Item"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-05 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Transport Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
