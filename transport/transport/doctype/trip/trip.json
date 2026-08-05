@@ -1,0 +1,252 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-TRIP-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "schedule_section",
+  "project",
+  "customer",
+  "column_break_schedule",
+  "trip_schedule",
+  "is_additional",
+  "route_section",
+  "route",
+  "direction",
+  "column_break_route",
+  "from_place",
+  "to_place",
+  "timing_section",
+  "trip_date",
+  "scheduled_time",
+  "column_break_timing",
+  "actual_pickup_time",
+  "actual_drop_time",
+  "assignment_section",
+  "vehicle",
+  "vehicle_class",
+  "column_break_assignment",
+  "driver",
+  "duty_type",
+  "status_section",
+  "status",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "schedule_section",
+   "fieldtype": "Section Break",
+   "label": "Project"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "project.customer",
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Client",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_schedule",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trip_schedule",
+   "fieldtype": "Link",
+   "label": "Trip Schedule",
+   "options": "Trip Schedule",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Ad-hoc trip created outside the recurring schedule.",
+   "fieldname": "is_additional",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Additional Trip"
+  },
+  {
+   "fieldname": "route_section",
+   "fieldtype": "Section Break",
+   "label": "Route"
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Route",
+   "options": "Route"
+  },
+  {
+   "default": "Pickup",
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Direction",
+   "options": "Pickup\nDrop",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_route",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "from_place",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "From",
+   "options": "Place",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_place",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "To",
+   "options": "Place",
+   "reqd": 1
+  },
+  {
+   "fieldname": "timing_section",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "fieldname": "trip_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Trip Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "scheduled_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Scheduled Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_timing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actual_pickup_time",
+   "fieldtype": "Time",
+   "label": "Actual Pickup Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_drop_time",
+   "fieldtype": "Time",
+   "label": "Actual Drop Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "assignment_section",
+   "fieldtype": "Section Break",
+   "label": "Driver & Vehicle Assignment"
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Vehicle",
+   "options": "Rental Vehicle"
+  },
+  {
+   "fetch_from": "vehicle.vehicle_class",
+   "fieldname": "vehicle_class",
+   "fieldtype": "Data",
+   "label": "Vehicle Class",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_assignment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver"
+  },
+  {
+   "default": "Duty",
+   "description": "Set automatically once the vehicle's trips for the day exceed its LMV/HMV daily limit (Transport Settings).",
+   "fieldname": "duty_type",
+   "fieldtype": "Select",
+   "label": "Duty Type",
+   "options": "Duty\nOT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nAssigned\nAccepted\nRejected\nStarted\nCompleted\nApproved\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Trip",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "trip_date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "route",
+ "track_changes": 1
+}

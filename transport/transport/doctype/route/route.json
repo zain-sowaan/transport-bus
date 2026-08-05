@@ -1,0 +1,163 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "TR-RT-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "route_section",
+  "route_name",
+  "project",
+  "column_break_route",
+  "vehicle_category",
+  "is_active",
+  "endpoints_section",
+  "from_place",
+  "column_break_endpoints",
+  "to_place",
+  "timing_section",
+  "pickup_time",
+  "column_break_timing",
+  "drop_time",
+  "column_break_km",
+  "standard_km",
+  "remarks_section",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "route_section",
+   "fieldtype": "Section Break",
+   "label": "Route"
+  },
+  {
+   "description": "As it should appear as a column heading on the monthly client timesheet, e.g. \"Abu Dhabi (Corniche Route) to WWML\".",
+   "fieldname": "route_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Route Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_route",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vehicle_category",
+   "fieldtype": "Select",
+   "label": "Vehicle Category Required",
+   "options": "\nPassenger\nGoods\nDouble Cabin"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "endpoints_section",
+   "fieldtype": "Section Break",
+   "label": "Endpoints"
+  },
+  {
+   "description": "The pickup-direction origin. The drop-direction leg is the reverse of this route.",
+   "fieldname": "from_place",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "From",
+   "options": "Place",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_endpoints",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_place",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "To",
+   "options": "Place",
+   "reqd": 1
+  },
+  {
+   "fieldname": "timing_section",
+   "fieldtype": "Section Break",
+   "label": "Standard Timing"
+  },
+  {
+   "fieldname": "pickup_time",
+   "fieldtype": "Time",
+   "label": "Standard Pickup Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_timing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "drop_time",
+   "fieldtype": "Time",
+   "label": "Standard Drop Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_km",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "standard_km",
+   "fieldtype": "Float",
+   "label": "Standard KM (One-Way)"
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Route",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "route_name",
+ "track_changes": 1
+}
