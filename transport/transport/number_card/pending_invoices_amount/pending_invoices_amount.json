@@ -1,0 +1,23 @@
+{
+ "aggregate_function_based_on": "outstanding_amount",
+ "creation": "2026-08-05 19:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Sales Invoice",
+ "dynamic_filters_json": "[]",
+ "filters_json": "[[\"Sales Invoice\",\"docstatus\",\"=\",\"1\",false],[\"Sales Invoice\",\"outstanding_amount\",\">\",\"0\",false],[\"Sales Invoice\",\"transport_timesheet\",\"is\",\"set\",false]]",
+ "function": "Sum",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Pending Invoices Amount",
+ "modified": "2026-08-05 19:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Pending Invoices Amount",
+ "owner": "Administrator",
+ "report_function": "Sum",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Daily",
+ "type": "Document Type"
+}

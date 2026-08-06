@@ -1,0 +1,96 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="customer-app">
+	<div class="customer-app-nav">
+		<h2>My Requests</h2>
+		<a href="/customer">&larr; Trips</a>
+	</div>
+
+	{% if error %}
+		<p class="text-muted">{{ error }}</p>
+	{% else %}
+		<div class="new-request">
+			<select id="request-type">
+				<option value="Additional Trip">Additional Trip</option>
+				<option value="Schedule Change">Schedule Change</option>
+				<option value="Complaint">Complaint</option>
+				<option value="Other">Other</option>
+			</select>
+			<textarea id="request-description" placeholder="Describe your request" rows="3"></textarea>
+			<p id="request-message"></p>
+			<button class="btn btn-primary" id="submit-request-btn">Submit Request</button>
+		</div>
+
+		<div class="request-list">
+			{% if not requests %}
+				<p class="text-muted">No requests yet.</p>
+			{% endif %}
+			{% for r in requests %}
+			<div class="request-card status-{{ r.status.lower().replace(' ', '-') }}">
+				<div class="request-card-top">
+					<span class="request-type">{{ r.request_type }}</span>
+					<span class="request-status">{{ r.status }}</span>
+				</div>
+				<div class="request-description">{{ r.description }}</div>
+				{% if r.response %}
+					<div class="request-response"><strong>Response:</strong> {{ r.response }}</div>
+				{% endif %}
+			</div>
+			{% endfor %}
+		</div>
+	{% endif %}
+</div>
+
+<style>
+	.customer-app { max-width: 560px; margin: 0 auto; padding: 12px; }
+	.customer-app-nav { display: flex; justify-content: space-between; align-items: baseline; }
+	.new-request { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 20px; }
+	.new-request select, .new-request textarea { padding: 8px; border: 1px solid #d1d8dd; border-radius: 6px; }
+	#request-message.msg-ok { color: #2e7d32; }
+	#request-message.msg-error { color: #c62828; }
+	.request-list { display: flex; flex-direction: column; gap: 10px; }
+	.request-card {
+		border: 1px solid #d1d8dd; border-radius: 8px; padding: 12px 14px;
+		border-left: 4px solid #8d99a6;
+	}
+	.request-card.status-open { border-left-color: #f0a400; }
+	.request-card.status-in-progress { border-left-color: #1976d2; }
+	.request-card.status-resolved { border-left-color: #2e7d32; }
+	.request-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #6c7680; margin-bottom: 6px; }
+	.request-response { margin-top: 8px; font-size: 13px; }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+	var btn = document.getElementById("submit-request-btn");
+	if (!btn) return;
+
+	btn.onclick = function() {
+		var description = document.getElementById("request-description").value;
+		var msg = document.getElementById("request-message");
+		if (!description) {
+			msg.className = "msg-error";
+			msg.textContent = "Description is required.";
+			return;
+		}
+		btn.disabled = true;
+		frappe.call({
+			method: "transport.transport.customer_portal.create_request",
+			args: {
+				request_type: document.getElementById("request-type").value,
+				description: description,
+			},
+			callback: function() {
+				window.location.reload();
+			},
+			error: function(r) {
+				msg.className = "msg-error";
+				msg.textContent = (r && r._server_messages) || "Something went wrong.";
+				btn.disabled = false;
+			},
+		});
+	};
+});
+</script>
+{% endblock %}

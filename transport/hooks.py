@@ -214,15 +214,22 @@ doc_events = {
 
 # Permissions
 # -----------
-# A driver's user only ever sees their own Trips - every state change goes
-# through a whitelisted method in driver_portal.py instead of a raw save.
+# A driver's user only ever sees their own Trips/Trip Expenses, and a
+# customer's user only ever sees their own Trips/Customer Requests - every
+# state change goes through a whitelisted method in driver_portal.py /
+# customer_portal.py instead of a raw save. transport/transport/permissions.py
+# dispatches to whichever portal module owns the calling user's role.
 
 permission_query_conditions = {
-	"Trip": "transport.transport.driver_portal.get_permission_query_conditions",
+	"Trip": "transport.transport.permissions.get_trip_permission_query_conditions",
+	"Trip Expense": "transport.transport.permissions.get_trip_expense_permission_query_conditions",
+	"Customer Request": "transport.transport.permissions.get_customer_request_permission_query_conditions",
 }
 
 has_permission = {
-	"Trip": "transport.transport.driver_portal.has_permission",
+	"Trip": "transport.transport.permissions.get_trip_has_permission",
+	"Trip Expense": "transport.transport.permissions.get_trip_expense_has_permission",
+	"Customer Request": "transport.transport.permissions.get_customer_request_has_permission",
 }
 
 # Testing

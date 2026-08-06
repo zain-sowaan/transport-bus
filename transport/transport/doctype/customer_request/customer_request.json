@@ -1,0 +1,159 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-CR-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-05 19:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "request_section",
+  "customer",
+  "project",
+  "column_break_request",
+  "request_type",
+  "status",
+  "raised_by",
+  "detail_section",
+  "description",
+  "response_section",
+  "response",
+  "responded_by",
+  "responded_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "request_section",
+   "fieldtype": "Section Break",
+   "label": "Request"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "column_break_request",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "request_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Request Type",
+   "options": "Additional Trip\nSchedule Change\nComplaint\nOther",
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nIn Progress\nResolved",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "raised_by",
+   "fieldtype": "Link",
+   "label": "Raised By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail_section",
+   "fieldtype": "Section Break",
+   "label": "Detail"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "response_section",
+   "fieldtype": "Section Break",
+   "label": "Response"
+  },
+  {
+   "fieldname": "response",
+   "fieldtype": "Small Text",
+   "label": "Response",
+   "read_only": 1
+  },
+  {
+   "fieldname": "responded_by",
+   "fieldtype": "Link",
+   "label": "Responded By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "responded_on",
+   "fieldtype": "Datetime",
+   "label": "Responded On",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-05 19:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Customer Request",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport In-Charge"
+  },
+  {
+   "read": 1,
+   "role": "Customer"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "request_type",
+ "track_changes": 1
+}

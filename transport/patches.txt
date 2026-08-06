@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 transport.patches.set_transport_settings_defaults
 transport.patches.set_transport_settings_defaults_p5
+transport.patches.add_customer_portal_menu_items

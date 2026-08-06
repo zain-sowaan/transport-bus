@@ -375,6 +375,10 @@
   {
    "read": 1,
    "role": "Transport Driver"
+  },
+  {
+   "read": 1,
+   "role": "Customer"
   }
  ],
  "row_format": "Dynamic",
