@@ -35,7 +35,11 @@ fixtures = [
 		# Expense Claim Type's autoname is field:expense_type, so the name
 		# IS the mapping, no lookup table needed.
 		"doctype": "Expense Claim Type",
-		"filters": [["name", "in", ["Fuel", "Salik / Toll", "Parking", "Maintenance", "Others"]]],
+		# "Others" is deliberately excluded: on this site it's a pre-existing
+		# site record this app doesn't own, already configured with real
+		# per-company GL accounts - fixture-syncing it would silently
+		# overwrite that live config with whatever ships in this repo.
+		"filters": [["name", "in", ["Fuel", "Salik / Toll", "Parking", "Maintenance"]]],
 	},
 ]
 

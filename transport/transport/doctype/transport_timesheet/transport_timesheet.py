@@ -104,8 +104,11 @@ class TransportTimesheet(Document):
 	def set_sales_order(self):
 		if self.sales_order:
 			return
+		# A Project can have more than one submitted Sales Order over its life
+		# (renewal/amendment) - take the most recent one rather than whichever
+		# row MySQL happens to return first.
 		self.sales_order = frappe.db.get_value(
-			"Sales Order", {"project": self.project, "docstatus": 1}, "name"
+			"Sales Order", {"project": self.project, "docstatus": 1}, "name", order_by="creation desc"
 		)
 
 	@frappe.whitelist()

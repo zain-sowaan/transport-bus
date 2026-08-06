@@ -78,6 +78,12 @@ class Trip(Document):
 				)
 
 	def set_duty_type(self):
+		if self.timesheet:
+			# Already pulled onto a Transport Timesheet - what got billed must
+			# not silently drift from what the Timesheet/OT report show, even
+			# if a later same-day Trip is added and this one gets resaved.
+			return
+
 		if not (self.vehicle and self.trip_date and self.vehicle_class):
 			self.duty_type = "Duty"
 			return

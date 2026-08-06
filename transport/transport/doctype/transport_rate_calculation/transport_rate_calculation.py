@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate
 
+QUOTATION_ROLES = ("Transport Operations", "System Manager")
+
 COST_COMPONENTS = (
 	"vehicle_rental_cost",
 	"fuel_cost",
@@ -64,6 +66,8 @@ class TransportRateCalculation(Document):
 
 	@frappe.whitelist()
 	def create_quotation(self):
+		if not any(role in frappe.get_roles() for role in QUOTATION_ROLES):
+			frappe.throw(_("Not permitted to create a Quotation."), frappe.PermissionError)
 		if self.quotation:
 			frappe.throw(_("Quotation {0} has already been created from this calculation.").format(self.quotation))
 

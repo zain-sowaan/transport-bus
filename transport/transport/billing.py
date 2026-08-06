@@ -22,6 +22,12 @@ def _check_accounts_role():
 @frappe.whitelist()
 def mark_grn_received(sales_invoice):
 	_check_accounts_role()
+
+	certificate = frappe.db.get_value("Sales Invoice", sales_invoice, "certificate_of_completion")
+	certificate_status = frappe.db.get_value("Certificate of Completion", certificate, "status") if certificate else None
+	if certificate_status != "Signed Copy Received":
+		frappe.throw(_("The Certificate of Completion's signed copy must be received before GRN can be marked Received."))
+
 	frappe.db.set_value(
 		"Sales Invoice", sales_invoice, {"grn_status": "Received", "grn_received_on": today()}
 	)
