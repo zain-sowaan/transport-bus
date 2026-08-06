@@ -179,6 +179,11 @@ def end_trip(trip_name, drop_photo, end_odometer=None, driver_remarks=None):
 		trip.doctype,
 		trip.name,
 	)
+	# Actual times only exist now, so hour-based OT can finally be decided.
+	from transport.transport.doctype.trip.trip import recalculate_duty_type
+
+	recalculate_duty_type(trip.name)
+
 	check_fatigue(trip.driver, trip.trip_date)
 	return trip.status
 

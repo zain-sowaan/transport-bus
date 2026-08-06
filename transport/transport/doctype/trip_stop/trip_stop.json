@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-06 17:30:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stop_type",
+  "place",
+  "scheduled_time",
+  "column_break_stop",
+  "no_of_passengers",
+  "actual_time",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "default": "Pickup",
+   "fieldname": "stop_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Stop Type",
+   "options": "Pickup\nDrop",
+   "reqd": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "place",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Place",
+   "options": "Place",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "scheduled_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Scheduled Time"
+  },
+  {
+   "fieldname": "column_break_stop",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "description": "Passengers boarding or alighting at this stop.",
+   "fieldname": "no_of_passengers",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "No. of Pax",
+   "non_negative": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "actual_time",
+   "fieldtype": "Time",
+   "label": "Actual Time"
+  },
+  {
+   "columns": 2,
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-06 17:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Trip Stop",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "idx",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

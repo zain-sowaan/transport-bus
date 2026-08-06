@@ -37,15 +37,35 @@ def check_sales_order_exists(project):
 		)
 
 
+WEEKEND = "Weekend"
+PUBLIC_HOLIDAY = "Public Holiday"
+
+
+def get_project_holiday_kind(project, date):
+	"""Returns None, "Weekend" or "Public Holiday" for a date on the Project's
+	holiday list. ERPNext's Holiday rows carry a `weekly_off` flag - that is
+	what separates a recurring weekend from a one-off public holiday, and the
+	source doc prices the two differently (separate Weekend Charges and Public
+	Holiday Charges columns on the project contract sheet), so callers that
+	bill need the distinction, not just a boolean."""
+	if not (project and date):
+		return None
+
+	holiday_list = frappe.db.get_value("Project", project, "holiday_list")
+	if not holiday_list:
+		return None
+
+	weekly_off = frappe.db.get_value(
+		"Holiday", {"parent": holiday_list, "holiday_date": getdate(date)}, "weekly_off"
+	)
+	if weekly_off is None:
+		return None
+
+	return WEEKEND if weekly_off else PUBLIC_HOLIDAY
+
+
 def is_project_holiday(project, date):
 	"""Shared by Trip.set_duty_type (weekend/PH auto-OT) and Transport
 	Timesheet.populate_trips (PH flag on the billing line) so both read the
 	same Project holiday_list the same way."""
-	if not (project and date):
-		return False
-
-	holiday_list = frappe.db.get_value("Project", project, "holiday_list")
-	if not holiday_list:
-		return False
-
-	return bool(frappe.db.exists("Holiday", {"parent": holiday_list, "holiday_date": getdate(date)}))
+	return get_project_holiday_kind(project, date) is not None

@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime
+from frappe.utils import flt, get_datetime, now_datetime, time_diff_in_hours
 
 from transport.transport.utils import check_sales_order_exists, is_project_holiday
 
@@ -16,10 +16,28 @@ class Trip(Document):
 	def validate(self):
 		self.check_sales_order()
 		self.set_route_endpoints()
+		self.sync_stops_with_endpoints()
 		self.check_double_booking()
 		self.check_blacklisted_driver()
 		self.set_duty_type()
 		self.set_assigned()
+
+	def sync_stops_with_endpoints(self):
+		"""Stops are additive detail on top of from_place/to_place, which Route,
+		the trip sheet and the timesheet matrix all still read. Keep the two
+		representations from drifting: the first stop is the origin and the last
+		is the destination."""
+		if not self.stops:
+			return
+
+		if len(self.stops) < 2:
+			frappe.throw(_("A Trip with stops needs at least two - an origin and a destination."))
+
+		self.from_place = self.stops[0].place
+		self.to_place = self.stops[-1].place
+
+		if self.stops[0].scheduled_time:
+			self.scheduled_time = self.stops[0].scheduled_time
 
 	def check_sales_order(self):
 		"""Only on creation, or if the Project is being changed - so switching
@@ -92,13 +110,82 @@ class Trip(Document):
 			# if a later same-day Trip is added and this one gets resaved.
 			return
 
-		if not (self.vehicle and self.trip_date and self.vehicle_class):
+		if not self.trip_date:
 			self.duty_type = "Duty"
 			return
 
 		if is_project_holiday(self.project, self.trip_date):
-			# Weekend/PH duty is always OT, even a vehicle's first trip that day.
+			# Weekend/PH duty is always OT, even the first trip of that day.
 			self.duty_type = "OT"
+			return
+
+		if (frappe.db.get_single_value("Transport Settings", "ot_basis") or "Trips") == "Hours":
+			self.set_duty_type_by_hours()
+		else:
+			self.set_duty_type_by_trip_count()
+
+	def set_duty_type_by_hours(self):
+		"""The client's driver-contract sheet defines overtime by hours worked
+		("fixed full time 10 hours", OT after 10), not by trip count. Hours are
+		per DRIVER per day - overtime is a payroll concept and the contract is
+		the driver's, which is why this counts the driver's day rather than the
+		vehicle's.
+
+		A trip's hours are only knowable once it has actually run, so an
+		unexecuted trip stays Duty and is re-evaluated when the driver ends it
+		(see recalculate_duty_type, called from driver_portal.end_trip)."""
+		duration = self.get_duration_hours()
+		if not (self.driver and duration):
+			self.duty_type = "Duty"
+			return
+
+		threshold = flt(frappe.db.get_single_value("Transport Settings", "daily_working_hours"))
+		if not threshold:
+			self.duty_type = "Duty"
+			return
+
+		hours_before_this = self.get_driver_hours_for_day()
+		self.duty_type = "OT" if (hours_before_this + duration) > threshold else "Duty"
+
+	def get_duration_hours(self):
+		"""Worked hours for this leg, from the driver's own start/end stamps."""
+		if not (self.actual_start_time and self.actual_end_time):
+			return 0
+
+		hours = time_diff_in_hours(self.actual_end_time, self.actual_start_time)
+		# A leg running past midnight comes back negative; treat it as wrapping
+		# to the next day rather than silently subtracting from the day's total.
+		return hours + 24 if hours < 0 else hours
+
+	def get_driver_hours_for_day(self):
+		"""Hours this driver has already worked on this date, excluding this
+		trip. Only counts legs that actually ran and were not rejected."""
+		rows = frappe.get_all(
+			"Trip",
+			filters={
+				"driver": self.driver,
+				"trip_date": self.trip_date,
+				"status": ("not in", ["Rejected", "Cancelled"]),
+				"name": ("!=", self.name or ""),
+				"actual_start_time": ("is", "set"),
+				"actual_end_time": ("is", "set"),
+			},
+			fields=["actual_start_time", "actual_end_time"],
+		)
+
+		total = 0
+		for row in rows:
+			hours = time_diff_in_hours(row.actual_end_time, row.actual_start_time)
+			total += hours + 24 if hours < 0 else hours
+		return total
+
+	def set_duty_type_by_trip_count(self):
+		"""The workflow document's prose rule: LMV 5 / HMV 4 trips per day, any
+		leg beyond that is OT. Kept alongside the hours rule because the two
+		source documents disagree and the client has not confirmed which
+		governs - switchable via Transport Settings.ot_basis."""
+		if not (self.vehicle and self.vehicle_class):
+			self.duty_type = "Duty"
 			return
 
 		daily_limit = self.get_daily_trip_limit()
@@ -120,6 +207,22 @@ class Trip(Document):
 	def get_daily_trip_limit(self):
 		settings_field = "hmv_daily_trip_limit" if self.vehicle_class == HMV_LABEL else "lmv_daily_trip_limit"
 		return frappe.db.get_single_value("Transport Settings", settings_field)
+
+
+def recalculate_duty_type(trip_name):
+	"""Re-evaluate Duty/OT once a trip's actual times exist. driver_portal's
+	start/end use db_set (deliberately - a driver must never trigger a full
+	save), which skips validate(), so hour-based OT would otherwise never be
+	applied to the trip that just finished."""
+	trip = frappe.get_doc("Trip", trip_name)
+	if trip.timesheet:
+		return trip.duty_type
+
+	before = trip.duty_type
+	trip.set_duty_type()
+	if trip.duty_type != before:
+		trip.db_set("duty_type", trip.duty_type)
+	return trip.duty_type
 
 
 @frappe.whitelist()

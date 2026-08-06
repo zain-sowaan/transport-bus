@@ -18,7 +18,8 @@
   "column_break_2",
   "duty_type",
   "is_additional",
-  "is_holiday"
+  "is_holiday",
+  "holiday_type"
  ],
  "fields": [
   {
@@ -116,12 +117,22 @@
    "in_list_view": 1,
    "label": "PH",
    "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "holiday_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Day Type",
+   "options": "\nWeekend\nPublic Holiday",
+   "read_only": 1,
+   "description": "Weekend and Public Holiday are charged at different rates, so the billing run needs the kind, not just a holiday flag."
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-05 16:00:00.000000",
+ "modified": "2026-08-06 17:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Timesheet Trip",

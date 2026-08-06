@@ -5,6 +5,8 @@
  "engine": "InnoDB",
  "field_order": [
   "trip_limits_section",
+  "ot_basis",
+  "daily_working_hours",
   "lmv_daily_trip_limit",
   "hmv_daily_trip_limit",
   "column_break_limits",
@@ -25,6 +27,11 @@
   "enforce_sales_order_for_trip",
   "billing_section",
   "transport_service_item",
+  "auto_bill_weekend_holiday",
+  "column_break_billing",
+  "weekend_charge_item",
+  "public_holiday_charge_item",
+  "weekend_holiday_charge_basis",
   "quality_section",
   "feedback_escalation_rating",
   "blacklist_threshold_points",
@@ -38,7 +45,26 @@
    "label": "Trip Limits"
   },
   {
+   "default": "Hours",
+   "description": "How Overtime is decided. \"Hours\" uses the driver's actual worked hours per day against Daily Working Hours below - this is what the client's driver-contract sheet specifies. \"Trips\" uses the LMV/HMV daily trip counts instead, which is how the workflow document's prose describes it. The two sources disagree; switch this if the client confirms the trip-count rule.",
+   "fieldname": "ot_basis",
+   "fieldtype": "Select",
+   "label": "Overtime Basis",
+   "options": "Hours\nTrips",
+   "reqd": 1
+  },
+  {
+   "default": "10",
+   "depends_on": "eval:doc.ot_basis=='Hours'",
+   "description": "A driver's standard working hours per day. Trips that take the driver past this total on a given day are marked Overtime.",
+   "fieldname": "daily_working_hours",
+   "fieldtype": "Float",
+   "label": "Daily Working Hours",
+   "non_negative": 1
+  },
+  {
    "default": "5",
+   "depends_on": "eval:doc.ot_basis=='Trips'",
    "description": "Light Motor Vehicle: maximum trips per day before extra legs count as Overtime.",
    "fieldname": "lmv_daily_trip_limit",
    "fieldtype": "Int",
@@ -48,6 +74,7 @@
   },
   {
    "default": "4",
+   "depends_on": "eval:doc.ot_basis=='Trips'",
    "description": "Heavy Motor Vehicle: maximum trips per day before extra legs count as Overtime.",
    "fieldname": "hmv_daily_trip_limit",
    "fieldtype": "Int",
@@ -175,6 +202,42 @@
    "options": "Item"
   },
   {
+   "default": "1",
+   "description": "Add weekend and public-holiday charge lines to the Sales Invoice automatically, using the rates set on the Project. Switch off to have Accounts add them by hand instead.",
+   "fieldname": "auto_bill_weekend_holiday",
+   "fieldtype": "Check",
+   "label": "Auto-bill Weekend / Public Holiday Charges"
+  },
+  {
+   "fieldname": "column_break_billing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.auto_bill_weekend_holiday",
+   "description": "Item used for the weekend charge line on the Sales Invoice.",
+   "fieldname": "weekend_charge_item",
+   "fieldtype": "Link",
+   "label": "Weekend Charge Item",
+   "options": "Item"
+  },
+  {
+   "depends_on": "eval:doc.auto_bill_weekend_holiday",
+   "description": "Item used for the public-holiday charge line on the Sales Invoice.",
+   "fieldname": "public_holiday_charge_item",
+   "fieldtype": "Link",
+   "label": "Public Holiday Charge Item",
+   "options": "Item"
+  },
+  {
+   "default": "Per Day",
+   "depends_on": "eval:doc.auto_bill_weekend_holiday",
+   "description": "Whether the Project's weekend/public-holiday rate is charged once per day worked, or once per trip. The client's contract sheet quotes a single rate against a shift, which reads as per day - confirm with the client before the first live invoice.",
+   "fieldname": "weekend_holiday_charge_basis",
+   "fieldtype": "Select",
+   "label": "Weekend / Holiday Charge Basis",
+   "options": "Per Day\nPer Trip"
+  },
+  {
    "fieldname": "quality_section",
    "fieldtype": "Section Break",
    "label": "Quality & Compliance"
@@ -215,7 +278,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-06 16:30:00.000000",
+ "modified": "2026-08-06 17:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Settings",

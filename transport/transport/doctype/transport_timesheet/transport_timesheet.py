@@ -17,9 +17,9 @@ that split."""
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, today
+from frappe.utils import flt, getdate, today
 
-from transport.transport.utils import is_project_holiday
+from transport.transport.utils import PUBLIC_HOLIDAY, WEEKEND, get_project_holiday_kind
 
 OPERATIONS_ROLES = ("Transport Operations", "System Manager")
 ACCOUNTS_ROLES = ("Transport Accounts", "System Manager")
@@ -66,6 +66,17 @@ class TransportTimesheet(Document):
 		self.total_ot_trips = sum(1 for t in self.trips if t.duty_type == "OT")
 		self.total_additional_trips = sum(1 for t in self.trips if t.is_additional)
 
+		# Both counts are kept because the charge basis is configurable: a rate
+		# quoted against a shift reads as per-day, but the client may confirm
+		# per-trip. Accounts can also see both before approving the invoice.
+		weekend_rows = [t for t in self.trips if t.holiday_type == WEEKEND]
+		holiday_rows = [t for t in self.trips if t.holiday_type == PUBLIC_HOLIDAY]
+
+		self.total_weekend_trips = len(weekend_rows)
+		self.total_public_holiday_trips = len(holiday_rows)
+		self.total_weekend_days = len({t.trip_date for t in weekend_rows})
+		self.total_public_holiday_days = len({t.trip_date for t in holiday_rows})
+
 	def on_trash(self):
 		if self.status != "Draft":
 			frappe.throw(_("Only a Draft Timesheet can be deleted."))
@@ -109,6 +120,7 @@ class TransportTimesheet(Document):
 
 		self.set("trips", [])
 		for trip in trips:
+			holiday_kind = get_project_holiday_kind(self.project, trip.trip_date)
 			self.append("trips", {
 				"trip": trip.name,
 				"trip_date": trip.trip_date,
@@ -121,7 +133,8 @@ class TransportTimesheet(Document):
 				"actual_end_time": trip.actual_end_time,
 				"duty_type": trip.duty_type,
 				"is_additional": trip.is_additional,
-				"is_holiday": is_project_holiday(self.project, trip.trip_date),
+				"is_holiday": bool(holiday_kind),
+				"holiday_type": holiday_kind,
 			})
 
 		self.save()
@@ -173,6 +186,60 @@ class TransportTimesheet(Document):
 		})
 		return "Customer Approved"
 
+	def add_weekend_holiday_charges(self, invoice):
+		"""The client's project contract sheet prices weekend and public-holiday
+		duty separately from the monthly rate (e.g. AED 310 weekend / AED 400
+		public holiday), so those days are billed on top of the Sales Order
+		line rather than being absorbed into it.
+
+		Rates live on the Project because they are per-contract. Nothing is
+		added when a rate is zero/unset, when the toggle is off, or when the
+		charge item is not configured - a missing rate must never silently
+		invoice as 0, and a missing item would otherwise throw mid-invoice."""
+		settings = frappe.get_single("Transport Settings")
+		if not settings.auto_bill_weekend_holiday:
+			return
+
+		per_day = (settings.weekend_holiday_charge_basis or "Per Day") == "Per Day"
+		project = frappe.db.get_value(
+			"Project",
+			self.project,
+			["transport_weekend_charge", "transport_public_holiday_charge"],
+			as_dict=True,
+		) or frappe._dict()
+
+		charges = (
+			(
+				_("Weekend Duty"),
+				settings.weekend_charge_item,
+				flt(project.transport_weekend_charge),
+				self.total_weekend_days if per_day else self.total_weekend_trips,
+			),
+			(
+				_("Public Holiday Duty"),
+				settings.public_holiday_charge_item,
+				flt(project.transport_public_holiday_charge),
+				self.total_public_holiday_days if per_day else self.total_public_holiday_trips,
+			),
+		)
+
+		for label, item_code, rate, qty in charges:
+			if not (item_code and rate and qty):
+				continue
+
+			invoice.append(
+				"items",
+				{
+					"item_code": item_code,
+					"qty": qty,
+					"rate": rate,
+					"description": _("{0} - {1} {2} ({3} to {4})").format(
+						label, qty, _("days") if per_day else _("trips"), self.period_from, self.period_to
+					),
+					"project": self.project,
+				},
+			)
+
 	@frappe.whitelist()
 	def create_sales_invoice(self):
 		if not any(role in frappe.get_roles() for role in ACCOUNTS_ROLES):
@@ -190,6 +257,7 @@ class TransportTimesheet(Document):
 		invoice.transport_timesheet = self.name
 		invoice.grn_status = "Pending"
 		invoice.invoice_submission_status = "Not Submitted"
+		self.add_weekend_holiday_charges(invoice)
 		invoice.insert()
 
 		self.db_set({"sales_invoice": invoice.name, "status": "Invoiced"})

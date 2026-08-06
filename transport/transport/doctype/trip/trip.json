@@ -18,6 +18,8 @@
   "column_break_route",
   "from_place",
   "to_place",
+  "stops_section",
+  "stops",
   "timing_section",
   "trip_date",
   "scheduled_time",
@@ -132,6 +134,19 @@
    "label": "To",
    "options": "Place",
    "reqd": 1
+  },
+  {
+   "fieldname": "stops_section",
+   "fieldtype": "Section Break",
+   "label": "Stops",
+   "collapsible": 1,
+   "description": "Optional. Use when a run collects from or drops at more than the two endpoints above. Leave empty for a simple point-to-point trip."
+  },
+  {
+   "fieldname": "stops",
+   "fieldtype": "Table",
+   "label": "Stops",
+   "options": "Trip Stop"
   },
   {
    "fieldname": "timing_section",
@@ -340,7 +355,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-05 12:00:00.000000",
+ "modified": "2026-08-06 17:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Trip",

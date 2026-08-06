@@ -8,3 +8,4 @@ transport.patches.set_transport_settings_defaults
 transport.patches.set_transport_settings_defaults_p5
 transport.patches.add_customer_portal_menu_items
 transport.patches.set_transport_settings_defaults_p7
+transport.patches.set_transport_settings_defaults_p8

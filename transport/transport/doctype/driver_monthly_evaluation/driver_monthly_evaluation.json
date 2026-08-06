@@ -1,0 +1,244 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TR-DME-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-06 17:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "driver_section",
+  "driver",
+  "employee",
+  "column_break_driver",
+  "evaluation_month",
+  "department",
+  "criteria_section",
+  "criteria",
+  "totals_section",
+  "total_score",
+  "max_total_score",
+  "column_break_totals",
+  "overall_rating",
+  "remarks_section",
+  "supervisor_remarks",
+  "recommended_action_section",
+  "action_bonus_award",
+  "action_additional_training",
+  "action_warning",
+  "column_break_action",
+  "action_disciplinary",
+  "action_eligible_promotion",
+  "acknowledgement_section",
+  "evaluator_name",
+  "evaluator_signature",
+  "evaluator_date",
+  "column_break_acknowledgement",
+  "driver_signature",
+  "driver_signature_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "driver_section",
+   "fieldtype": "Section Break",
+   "label": "Driver"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee ID",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "column_break_driver",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "evaluation_month",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Month",
+   "reqd": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "criteria_section",
+   "fieldtype": "Section Break",
+   "label": "Evaluation Criteria"
+  },
+  {
+   "fieldname": "criteria",
+   "fieldtype": "Table",
+   "label": "Criteria",
+   "options": "Driver Monthly Evaluation Criteria",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_score",
+   "fieldtype": "Int",
+   "label": "Total Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "max_total_score",
+   "fieldtype": "Int",
+   "label": "Max Total Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "overall_rating",
+   "fieldtype": "Data",
+   "label": "Overall Rating",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Supervisor Remarks"
+  },
+  {
+   "fieldname": "supervisor_remarks",
+   "fieldtype": "Small Text",
+   "label": "Supervisor Remarks"
+  },
+  {
+   "fieldname": "recommended_action_section",
+   "fieldtype": "Section Break",
+   "label": "Recommended Action"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_bonus_award",
+   "fieldtype": "Check",
+   "label": "Bonus/Award"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_additional_training",
+   "fieldtype": "Check",
+   "label": "Additional Training"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_warning",
+   "fieldtype": "Check",
+   "label": "Verbal/Written Warning"
+  },
+  {
+   "fieldname": "column_break_action",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_disciplinary",
+   "fieldtype": "Check",
+   "label": "Disciplinary Action"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_eligible_promotion",
+   "fieldtype": "Check",
+   "label": "Eligible for Promotion"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "acknowledgement_section",
+   "fieldtype": "Section Break",
+   "label": "Acknowledgement"
+  },
+  {
+   "fieldname": "evaluator_name",
+   "fieldtype": "Data",
+   "label": "Evaluator Name"
+  },
+  {
+   "fieldname": "evaluator_signature",
+   "fieldtype": "Signature",
+   "label": "Evaluator Signature"
+  },
+  {
+   "fieldname": "evaluator_date",
+   "fieldtype": "Date",
+   "label": "Evaluator Date"
+  },
+  {
+   "fieldname": "column_break_acknowledgement",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_signature",
+   "fieldtype": "Signature",
+   "label": "Driver Signature"
+  },
+  {
+   "fieldname": "driver_signature_date",
+   "fieldtype": "Date",
+   "label": "Driver Signature Date"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-06 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Driver Monthly Evaluation",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport In-Charge"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "driver",
+ "track_changes": 1
+}

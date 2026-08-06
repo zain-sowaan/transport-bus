@@ -22,6 +22,12 @@
   "column_break_totals",
   "total_ot_trips",
   "total_additional_trips",
+  "holiday_totals_section",
+  "total_weekend_days",
+  "total_weekend_trips",
+  "column_break_holiday",
+  "total_public_holiday_days",
+  "total_public_holiday_trips",
   "operations_section",
   "operations_approved_by",
   "operations_approved_on",
@@ -205,11 +211,44 @@
    "label": "Certificate of Completion",
    "options": "Certificate of Completion",
    "read_only": 1
+  },
+  {
+   "fieldname": "holiday_totals_section",
+   "fieldtype": "Section Break",
+   "label": "Weekend & Public Holiday"
+  },
+  {
+   "fieldname": "total_weekend_days",
+   "fieldtype": "Int",
+   "label": "Weekend Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_weekend_trips",
+   "fieldtype": "Int",
+   "label": "Weekend Trips",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_holiday",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_public_holiday_days",
+   "fieldtype": "Int",
+   "label": "Public Holiday Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_public_holiday_trips",
+   "fieldtype": "Int",
+   "label": "Public Holiday Trips",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-05 16:00:00.000000",
+ "modified": "2026-08-06 17:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Timesheet",
