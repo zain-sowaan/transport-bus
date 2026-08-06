@@ -27,7 +27,10 @@ def get_columns():
 		{"label": _("Duty"), "fieldname": "duty_mark", "fieldtype": "Data", "width": 60},
 		{"label": _("OT"), "fieldname": "ot_mark", "fieldtype": "Data", "width": 60},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data", "width": 90},
-		{"label": _("Remarks"), "fieldname": "remarks", "fieldtype": "Data", "width": 200},
+		# The source trip-sheet spreadsheet keeps two separate remarks columns -
+		# the office's own "Duty Remarks" and whatever the driver wrote in.
+		{"label": _("Duty Remarks"), "fieldname": "remarks", "fieldtype": "Data", "width": 180},
+		{"label": _("Driver's Remarks"), "fieldname": "driver_remarks", "fieldtype": "Data", "width": 180},
 	]
 
 
@@ -56,7 +59,7 @@ def get_data(filters):
 		select
 			t.trip_date, t.customer, t.project, t.from_place, t.to_place, t.direction,
 			t.scheduled_time, t.driver, d.full_name as driver_name, t.vehicle,
-			t.vehicle_class, t.duty_type, t.status, t.remarks
+			t.vehicle_class, t.duty_type, t.status, t.remarks, t.driver_remarks
 		from `tabTrip` t
 		left join `tabDriver` d on d.name = t.driver
 		where {" and ".join(conditions)}

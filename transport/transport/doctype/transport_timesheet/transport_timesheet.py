@@ -30,6 +30,35 @@ class TransportTimesheet(Document):
 		if self.period_to and getdate(self.period_to) < getdate(self.period_from):
 			frappe.throw(_("Period To cannot be before Period From."))
 		self.calculate_totals()
+		self.push_manual_edits_to_trips()
+
+	def push_manual_edits_to_trips(self):
+		"""Source doc, Timesheet section: "Manual edits only for driver/vehicle
+		changes." Those two columns are the only editable ones on the child
+		table, but editing them there would otherwise be cosmetic - the real
+		Trip record would keep the old driver/vehicle, so the Trip Sheet, OT
+		report and P&L would all still show what was originally assigned.
+		Only while Draft: once the timesheet is approved or invoiced, its lines
+		are the billing record and must not be rewritten."""
+		if self.status != "Draft" or self.is_new():
+			return
+
+		for row in self.trips:
+			if not row.trip:
+				continue
+
+			current = frappe.db.get_value("Trip", row.trip, ["driver", "vehicle"], as_dict=True)
+			if not current:
+				continue
+
+			changes = {}
+			if row.driver and row.driver != current.driver:
+				changes["driver"] = row.driver
+			if row.vehicle and row.vehicle != current.vehicle:
+				changes["vehicle"] = row.vehicle
+
+			if changes:
+				frappe.db.set_value("Trip", row.trip, changes)
 
 	def calculate_totals(self):
 		self.total_trips = len(self.trips)

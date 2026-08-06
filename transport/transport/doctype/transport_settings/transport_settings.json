@@ -21,6 +21,8 @@
   "pricing_section",
   "enforce_minimum_margin",
   "default_minimum_margin_percent",
+  "controls_section",
+  "enforce_sales_order_for_trip",
   "billing_section",
   "transport_service_item",
   "quality_section",
@@ -149,6 +151,18 @@
    "label": "Default Minimum Margin %"
   },
   {
+   "fieldname": "controls_section",
+   "fieldtype": "Section Break",
+   "label": "Mandatory Controls"
+  },
+  {
+   "default": "1",
+   "description": "Block Trip creation (including generation from a Trip Schedule) unless the Trip's Project has a submitted Sales Order.",
+   "fieldname": "enforce_sales_order_for_trip",
+   "fieldtype": "Check",
+   "label": "Require Sales Order before Trip"
+  },
+  {
    "fieldname": "billing_section",
    "fieldtype": "Section Break",
    "label": "Billing"
@@ -201,7 +215,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-05 09:00:00.000000",
+ "modified": "2026-08-06 16:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Settings",

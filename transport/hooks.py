@@ -214,6 +214,10 @@ scheduler_events = {
 doc_events = {
 	"Opportunity": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
 	"Quotation": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
+	"Sales Order": {
+		"validate": "transport.transport.crm_controls.sync_transport_project",
+		"on_submit": "transport.transport.crm_controls.notify_operations_on_sales_order",
+	},
 }
 
 # Permissions

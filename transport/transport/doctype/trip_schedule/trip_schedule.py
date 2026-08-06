@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, getdate
 
+from transport.transport.utils import check_sales_order_exists
+
 WEEKDAY_FIELDS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
 
@@ -19,6 +21,10 @@ class TripSchedule(Document):
 
 	@frappe.whitelist()
 	def generate_trips(self, from_date=None, to_date=None):
+		# Checked once up front rather than letting the first Trip.insert()
+		# throw partway through a batch, leaving a half-generated range behind.
+		check_sales_order_exists(self.project)
+
 		route = frappe.get_doc("Route", self.route)
 
 		from_date = getdate(from_date) if from_date else self.next_generation_start()

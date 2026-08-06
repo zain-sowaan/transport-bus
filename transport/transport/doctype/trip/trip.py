@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
-from transport.transport.utils import is_project_holiday
+from transport.transport.utils import check_sales_order_exists, is_project_holiday
 
 LMV_LABEL = "LMV (Light Motor Vehicle)"
 HMV_LABEL = "HMV (Heavy Motor Vehicle)"
@@ -14,11 +14,19 @@ HMV_LABEL = "HMV (Heavy Motor Vehicle)"
 
 class Trip(Document):
 	def validate(self):
+		self.check_sales_order()
 		self.set_route_endpoints()
 		self.check_double_booking()
 		self.check_blacklisted_driver()
 		self.set_duty_type()
 		self.set_assigned()
+
+	def check_sales_order(self):
+		"""Only on creation, or if the Project is being changed - so switching
+		this control on doesn't retroactively block edits to Trips that already
+		exist on a site being brought into compliance."""
+		if self.is_new() or self.has_value_changed("project"):
+			check_sales_order_exists(self.project)
 
 	def check_blacklisted_driver(self):
 		if self.driver and frappe.db.get_value("Driver", self.driver, "is_blacklisted"):

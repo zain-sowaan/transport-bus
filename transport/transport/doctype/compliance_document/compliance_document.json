@@ -55,7 +55,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Document Type",
-   "options": "Mulkiya (Registration)\nInsurance Policy\nAsateel Permit\nSpeed Certificate\nPassing Report\nDriving License\nCICPA Pass\nADNOC Medical Report\nTraining Certificate\nTrade License\nCustomer LPO / Agreement\nEmirates ID / Passport\nSecurity Cheque\nVAT Certificate\nPOA\nICV Certificate\nISO Certificate\nCorporate Tax Certificate\nVAT Return\nOther",
+   "options": "Mulkiya (Registration)\nInsurance Policy\nAsateel Permit\nSpeed Certificate\nPassing Report\nDriving License\nCICPA Pass\nADNOC Medical Report\nTraining Certificate\nTrade License\nCustomer LPO / Agreement\nEmirates ID / Passport\nSecurity Cheque\nVAT Certificate\nPOA\nICV Certificate\nISO Certificate\nCorporate Tax Certificate\nVAT Return\nE-Channel Renewal\nTawteek\nCivil Defence\nRTA\nOther",
    "reqd": 1
   },
   {
@@ -120,7 +120,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-05 09:00:00.000000",
+ "modified": "2026-08-06 16:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Compliance Document",
