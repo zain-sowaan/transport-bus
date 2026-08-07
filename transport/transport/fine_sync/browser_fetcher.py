@@ -99,6 +99,20 @@ class BrowserFetcher(FineFetcher):
 				f"{self.portal.name} presented a CAPTCHA. This lookup has to be completed by a person."
 			)
 
+	def _settle(self, page):
+		"""Wait for the page to stop moving, tolerating a slow or chatty portal.
+
+		Neither wait is guaranteed to fire - a portal that keeps a connection
+		open never reaches networkidle - so both are best-effort and the
+		caller proceeds regardless.
+		"""
+		for state in ("load", "networkidle"):
+			try:
+				page.wait_for_load_state(state, timeout=15000)
+			except Exception:
+				pass
+		page.wait_for_timeout(1500)
+
 	# -- capture -----------------------------------------------------------
 	def capture_page(self, url=None):
 		"""Record a portal page so its real contract can be written down.
@@ -116,19 +130,33 @@ class BrowserFetcher(FineFetcher):
 
 		page.goto(target, wait_until="domcontentloaded")
 
-		content = page.content() or ""
-		lowered = content.lower()
+		# These portals redirect client-side after the initial load - MOI's
+		# direct service route bounces to its unified sign-in. Reading the DOM
+		# while that is in flight throws "Execution context was destroyed", so
+		# let the page settle first and retry once if it moves under us.
+		self._settle(page)
 
-		inputs = page.eval_on_selector_all(
-			"input, select, textarea",
-			"""els => els.map(e => ({
-				tag: e.tagName.toLowerCase(),
-				type: e.getAttribute('type'),
-				name: e.getAttribute('name'),
-				id: e.getAttribute('id'),
-				placeholder: e.getAttribute('placeholder')
-			}))""",
-		)
+		content, inputs = "", []
+		for attempt in (1, 2):
+			try:
+				content = page.content() or ""
+				inputs = page.eval_on_selector_all(
+					"input, select, textarea",
+					"""els => els.map(e => ({
+						tag: e.tagName.toLowerCase(),
+						type: e.getAttribute('type'),
+						name: e.getAttribute('name'),
+						id: e.getAttribute('id'),
+						placeholder: e.getAttribute('placeholder')
+					}))""",
+				)
+				break
+			except Exception:
+				if attempt == 2:
+					raise
+				self._settle(page)
+
+		lowered = content.lower()
 
 		return {
 			"requested_url": target,
