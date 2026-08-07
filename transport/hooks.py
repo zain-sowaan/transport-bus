@@ -218,6 +218,9 @@ doc_events = {
 		"validate": "transport.transport.crm_controls.sync_transport_project",
 		"on_submit": "transport.transport.crm_controls.notify_operations_on_sales_order",
 	},
+	# Rental Vehicle is fleetify's doctype - extended here via Custom Field
+	# fixtures plus this event, never by editing their files.
+	"Rental Vehicle": {"validate": "transport.transport.vehicle_plate.normalize_plate"},
 }
 
 # Permissions
