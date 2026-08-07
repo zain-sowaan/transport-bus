@@ -20,8 +20,10 @@
   "last_verified": "46237",
   "scope_note": "Federal service and common route for northern-emirate traffic files",
   "notes": "The direct service code scode=486 is valid and redirects to MOI unified login. The service-description URL remains useful for documentation, but is not the exact transactional entry point.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -44,8 +46,10 @@
   "last_verified": "46237",
   "scope_note": "Abu Dhabi traffic fines; current customer journey may be consolidated into TAMM",
   "notes": "Official lookup methods are unified traffic number, plate information and driving-licence information. Emirates ID is not documented as the public fine-query key. Current public/member routing remains mixed between legacy e-services and TAMM.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Not Supported",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -68,8 +72,10 @@
   "last_verified": "46237",
   "scope_note": "Dubai Police traffic fines",
   "notes": "The indexed service URL is on the official ecrime.dubaipolice.gov.ae host. A www.dubaipolice.gov.ae alias was not confirmed as the canonical fine-page URL.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Not Supported",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -92,8 +98,10 @@
   "last_verified": "46237",
   "scope_note": "Dubai vehicle fines and RTA-administered fine categories",
   "notes": "The official RTA service page links to the traffic.rta.ae fine form. A redirect from traffic.rta.ae back to rta.ae was not established. The homepage quick-check widget is protected by Google reCAPTCHA.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -116,8 +124,10 @@
   "last_verified": "46237",
   "scope_note": "General Sharjah Police traffic fines",
   "notes": "No current dedicated Sharjah Police fine-inquiry form was confirmed. Official Sharjah traffic/licensing guidance points users to the MOI website or MOI app.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -140,8 +150,10 @@
   "last_verified": "46237",
   "scope_note": "SRTA transport-related fines; separate from Sharjah Police/MOI traffic fines",
   "notes": "Likely covers SRTA transport/operational fines, not the complete Sharjah Police road-traffic registry. Page footer shows an old last-updated date, so scope and availability need live validation.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Automated",
+  "fetcher_key": "srta"
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -164,8 +176,10 @@
   "last_verified": "46237",
   "scope_note": "Ajman traffic fines",
   "notes": "Ajman Police has an official website and traffic e-services catalogue, but no standalone fine-inquiry form was identified. Official Digital Ajman guidance routes fine payment through MOI or the AjmanOne app.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -188,8 +202,10 @@
   "last_verified": "46237",
   "scope_note": "Umm Al Quwain traffic fines",
   "notes": "Official UAQ service guides direct traffic-fine payment through the MOI smart app; no standalone UAQ browser fine form was confirmed.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -212,8 +228,10 @@
   "last_verified": "46237",
   "scope_note": "Ras Al Khaimah traffic fines",
   "notes": "RAK Police's official service card routes general police traffic fines to MOI. Do not classify this channel as guest-accessible without a live authenticated/unauthenticated comparison.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -236,8 +254,10 @@
   "last_verified": "46237",
   "scope_note": "Fujairah traffic fines",
   "notes": "Local Fujairah e-services are login-gated and currently redirect to SSO. Fine lookup is mapped to the federal MOI route pending local confirmation.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -260,8 +280,10 @@
   "last_verified": "46237",
   "scope_note": "Unified vehicle-services channel; emirate coverage and current lookup modes require live validation",
   "notes": "Official exception to the .gov.ae-only rule: u.ae lists Emirates Vehicle Gate as a government-approved channel. The historical direct fine URL https://evg.ae/_layouts/evg/finepayment0.aspx?language=en timed out and is recorded only as a candidate.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Not Supported",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -284,8 +306,10 @@
   "last_verified": "46237",
   "scope_note": "DARB toll-system violations only, not general road-traffic fines",
   "notes": "Separate from Abu Dhabi Police traffic fines. Covers DARB road-toll violations such as unregistered vehicles, insufficient balance, manipulation and gate damage.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Not Supported",
+  "fetcher_key": null
  },
  {
   "doctype": "Traffic Fine Portal",
@@ -308,7 +332,9 @@
   "last_verified": "46237",
   "scope_note": "Transportation-related fines only",
   "notes": "Separate from RAK Police/MOI fines. RAKTA explicitly states that it handles transportation-related violations, not general traffic-violation payment.",
-  "modified": "2026-08-07 11:00:00.000000",
-  "docstatus": 0
+  "modified": "2026-08-07 13:00:00.000000",
+  "docstatus": 0,
+  "fetch_mode": "Operator Assisted",
+  "fetcher_key": null
  }
 ]

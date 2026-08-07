@@ -10,3 +10,4 @@ transport.patches.add_customer_portal_menu_items
 transport.patches.set_transport_settings_defaults_p7
 transport.patches.set_transport_settings_defaults_p8
 transport.patches.set_transport_settings_defaults_p9
+transport.patches.seed_traffic_fine_portals

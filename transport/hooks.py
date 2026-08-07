@@ -41,13 +41,6 @@ fixtures = [
 		# overwrite that live config with whatever ships in this repo.
 		"filters": [["name", "in", ["Fuel", "Salik / Toll", "Parking", "Maintenance"]]],
 	},
-	{
-		# The 13 official UAE traffic-fine portals, seeded from the reviewed
-		# inventory. This app owns these records outright - they are reference
-		# data about public government services, not site data - so the whole
-		# doctype ships rather than a filtered subset.
-		"doctype": "Traffic Fine Portal",
-	},
 ]
 
 # Apps

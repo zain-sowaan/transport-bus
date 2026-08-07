@@ -51,7 +51,76 @@ def get_fleet_for_sync():
 
 
 @frappe.whitelist()
-def run_sync(portal, limit=None):
+def fetch_fines_for_vehicles(vehicles=None):
+	"""The "Fetch Fines" action, for a chosen set of vehicles.
+
+	Runs every portal that can genuinely be queried unattended, and reports -
+	rather than hides - everything it could not cover. Today that means one
+	portal: SRTA, which carries transport and toll violations only. Police
+	fines sit behind sign-in walls (MOI on UAE Pass and reCAPTCHA, RAKTA and
+	RTA on login forms) and need a person.
+
+	The coverage summary is the point of this function. Fetching some fines and
+	presenting it as "your fines" is how a fleet ends up believing it is clear
+	when it is not.
+	"""
+	_check_permission()
+
+	if isinstance(vehicles, str):
+		vehicles = json.loads(vehicles)
+	if not vehicles:
+		frappe.throw(_("Select at least one vehicle."))
+
+	from transport.transport.doctype.traffic_fine_portal.traffic_fine_portal import get_syncable_portals
+
+	automated = [p for p in get_syncable_portals() if p.get("fetch_mode") == "Automated"]
+
+	# Operator-assisted portals are queried separately and deliberately NOT via
+	# get_syncable_portals(): "enabled for sync" means enabled for UNATTENDED
+	# sync, which one of these can never be. Requiring it here would have made
+	# the pending list permanently empty - which is precisely the silence this
+	# summary exists to break.
+	assisted = frappe.get_all(
+		"Traffic Fine Portal",
+		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
+		fields=["name", "scope", "captcha_type"],
+	)
+
+	runs, staged_total = [], 0
+	for portal in automated:
+		result = run_sync(portal.name, vehicles=vehicles)
+		runs.append(result)
+		staged_total += result.get("fines_new") or 0
+
+	# Anything not automated is real, uncovered work - name it.
+	pending = [
+		{"portal": p.name, "reason": p.captcha_type or _("Requires an operator to sign in.")}
+		for p in assisted
+	]
+
+	police_covered = any(
+		frappe.db.get_value("Traffic Fine Portal", p.name, "scope") == "Police Traffic Fines"
+		for p in automated
+	)
+
+	return {
+		"vehicles": len(vehicles),
+		"runs": runs,
+		"fines_staged": staged_total,
+		"portals_queried": [p.name for p in automated],
+		"pending_operator": pending,
+		"police_fines_covered": police_covered,
+		"coverage_note": (
+			_("Police traffic fines were NOT included - no police portal can be queried "
+			  "unattended. This covers transport and toll violations only.")
+			if not police_covered
+			else None
+		),
+	}
+
+
+@frappe.whitelist()
+def run_sync(portal, limit=None, vehicles=None):
 	"""Fetch fines for the fleet from one portal.
 
 	Refuses outright unless the portal is enabled AND holds an unexpired
@@ -85,6 +154,17 @@ def run_sync(portal, limit=None):
 	run.insert(ignore_permissions=True)
 
 	queryable, unqueryable = get_fleet_for_sync()
+
+	if vehicles:
+		if isinstance(vehicles, str):
+			vehicles = json.loads(vehicles)
+		wanted = set(vehicles)
+		queryable = [v for v in queryable if v.name in wanted]
+		# Keep the unqueryable ones that were actually selected, so a chosen
+		# vehicle missing its plate parts is still reported rather than
+		# disappearing from the run.
+		unqueryable = [v for v in unqueryable if v.name in wanted]
+
 	if limit:
 		queryable = queryable[: int(limit)]
 

@@ -60,7 +60,13 @@ def get_syncable_portals():
 	portals = frappe.get_all(
 		"Traffic Fine Portal",
 		filters={"is_enabled": 1, "has_written_authorization": 1},
-		fields=["name", "authority", "access_route", "scope", "authorization_expires_on"],
+		fields=[
+			"name", "authority", "access_route", "scope",
+			# fetch_mode is what callers use to split automated work from work
+			# that needs a person - omitting it silently made every portal look
+			# non-automated and the fetch do nothing.
+			"fetch_mode", "fetcher_key", "authorization_expires_on",
+		],
 	)
 	today = getdate(nowdate())
 	return [
