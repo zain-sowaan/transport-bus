@@ -1,0 +1,254 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:portal_name",
+ "creation": "2026-08-07 11:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identity_section",
+  "portal_name",
+  "authority",
+  "emirate",
+  "column_break_identity",
+  "access_route",
+  "scope",
+  "public_form_url",
+  "gate_section",
+  "is_enabled",
+  "has_written_authorization",
+  "column_break_gate",
+  "authorization_reference",
+  "authorization_expires_on",
+  "access_section",
+  "authentication",
+  "captcha_type",
+  "required_inputs",
+  "column_break_access",
+  "backend_api_status",
+  "tos_url",
+  "tos_note",
+  "review_section",
+  "confidence",
+  "last_verified",
+  "column_break_review",
+  "scope_note",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Portal"
+  },
+  {
+   "fieldname": "portal_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Portal Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "authority",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Authority",
+   "reqd": 1
+  },
+  {
+   "fieldname": "emirate",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Emirate",
+   "options": "Federal / UAE-wide\nAbu Dhabi\nDubai\nSharjah\nAjman\nUmm Al Quwain\nRas Al Khaimah\nFujairah",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "MOI Federated portals are reachable through the single MOI route, so one integration serves all of them.",
+   "fieldname": "access_route",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Access Route",
+   "options": "MOI Federated\nIndependent\nSide Registry\nUnverified",
+   "reqd": 1
+  },
+  {
+   "description": "Side registries cover transport or toll violations only and are NOT a substitute for the police traffic-fine registry.",
+   "fieldname": "scope",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Scope",
+   "options": "Police Traffic Fines\nTransport / Toll Only\nUnified Channel",
+   "reqd": 1
+  },
+  {
+   "fieldname": "public_form_url",
+   "fieldtype": "Data",
+   "label": "Public Form URL",
+   "options": "URL",
+   "length": 500
+  },
+  {
+   "fieldname": "gate_section",
+   "fieldtype": "Section Break",
+   "label": "Access Control"
+  },
+  {
+   "default": "0",
+   "description": "A fine sync must never run against a portal that is not enabled. Enabling requires written authorization below.",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled for Sync"
+  },
+  {
+   "default": "0",
+   "description": "Written authorization to access this portal in an automated manner. No portal's terms of service permit automated access by default, so this must be obtained per portal before any sync.",
+   "fieldname": "has_written_authorization",
+   "fieldtype": "Check",
+   "label": "Written Authorization Held"
+  },
+  {
+   "fieldname": "column_break_gate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "has_written_authorization",
+   "fieldname": "authorization_reference",
+   "fieldtype": "Data",
+   "label": "Authorization Reference"
+  },
+  {
+   "depends_on": "has_written_authorization",
+   "description": "Leave blank if the authorization does not expire.",
+   "fieldname": "authorization_expires_on",
+   "fieldtype": "Date",
+   "label": "Authorization Expires On"
+  },
+  {
+   "fieldname": "access_section",
+   "fieldtype": "Section Break",
+   "label": "Access Requirements"
+  },
+  {
+   "fieldname": "authentication",
+   "fieldtype": "Small Text",
+   "label": "Authentication"
+  },
+  {
+   "fieldname": "captcha_type",
+   "fieldtype": "Small Text",
+   "label": "CAPTCHA"
+  },
+  {
+   "fieldname": "required_inputs",
+   "fieldtype": "Small Text",
+   "label": "Required Inputs"
+  },
+  {
+   "fieldname": "column_break_access",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Not Observed",
+   "description": "No backend request has been captured for any portal. Capture requires written authorization and lawfully controlled test data.",
+   "fieldname": "backend_api_status",
+   "fieldtype": "Select",
+   "label": "Backend API",
+   "options": "Not Observed\nCaptured"
+  },
+  {
+   "fieldname": "tos_url",
+   "fieldtype": "Data",
+   "label": "Terms of Service URL",
+   "options": "URL",
+   "length": 500
+  },
+  {
+   "fieldname": "tos_note",
+   "fieldtype": "Small Text",
+   "label": "Terms / Automation Note"
+  },
+  {
+   "fieldname": "review_section",
+   "fieldtype": "Section Break",
+   "label": "Review"
+  },
+  {
+   "fieldname": "confidence",
+   "fieldtype": "Data",
+   "label": "Confidence"
+  },
+  {
+   "fieldname": "last_verified",
+   "fieldtype": "Data",
+   "label": "Last Verified"
+  },
+  {
+   "fieldname": "column_break_review",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "scope_note",
+   "fieldtype": "Small Text",
+   "label": "Scope Note"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes / Issues"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-07 11:05:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Traffic Fine Portal",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Accounts",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "portal_name",
+ "track_changes": 1
+}
