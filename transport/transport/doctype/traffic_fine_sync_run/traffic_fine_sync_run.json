@@ -1,0 +1,175 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "creation": "2026-08-07 12:00:00.000000",
+ "modified": "2026-08-07 12:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "module": "Transport",
+ "links": [],
+ "states": [],
+ "row_format": "Dynamic",
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "track_changes": 1,
+ "name": "Traffic Fine Sync Run",
+ "fields": [
+  {
+   "fieldname": "portal",
+   "fieldtype": "Link",
+   "options": "Traffic Fine Portal",
+   "label": "Portal",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "reqd": 1,
+   "default": "Running",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "options": "Running\nCompleted\nCompleted with Errors\nFailed",
+   "read_only": 1,
+   "description": "\"Completed with Errors\" means some vehicles could not be queried. Their fines are unknown, NOT zero."
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_on",
+   "fieldtype": "Datetime",
+   "label": "Started On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "finished_on",
+   "fieldtype": "Datetime",
+   "label": "Finished On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "triggered_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Triggered By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec1",
+   "fieldtype": "Section Break",
+   "label": "Result"
+  },
+  {
+   "fieldname": "vehicles_queried",
+   "fieldtype": "Int",
+   "label": "Vehicles Queried",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vehicles_failed",
+   "fieldtype": "Int",
+   "label": "Vehicles Failed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fines_found",
+   "fieldtype": "Int",
+   "label": "Fines Found",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fines_new",
+   "fieldtype": "Int",
+   "label": "New Fines Staged",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec2",
+   "fieldtype": "Section Break",
+   "label": "Per Vehicle"
+  },
+  {
+   "fieldname": "vehicles",
+   "fieldtype": "Table",
+   "options": "Traffic Fine Sync Vehicle",
+   "label": "Vehicles"
+  },
+  {
+   "fieldname": "sec3",
+   "fieldtype": "Section Break",
+   "label": "Log"
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Code",
+   "label": "Error Log",
+   "read_only": 1
+  }
+ ],
+ "field_order": [
+  "portal",
+  "status",
+  "col1",
+  "started_on",
+  "finished_on",
+  "triggered_by",
+  "sec1",
+  "vehicles_queried",
+  "vehicles_failed",
+  "col2",
+  "fines_found",
+  "fines_new",
+  "sec2",
+  "vehicles",
+  "sec3",
+  "error_log"
+ ],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Accounts",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "autoname": "TR-TFS-.YYYY.-.MM.-.#####",
+ "title_field": "portal"
+}

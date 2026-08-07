@@ -36,7 +36,11 @@
   "feedback_escalation_rating",
   "blacklist_threshold_points",
   "column_break_quality",
-  "black_points_per_fine"
+  "black_points_per_fine",
+  "fine_sync_section",
+  "enable_scheduled_fine_sync",
+  "column_break_fine_sync",
+  "imported_fine_responsibility"
  ],
  "fields": [
   {
@@ -272,13 +276,37 @@
    "label": "Black Points per Fine (Driver Responsibility)",
    "non_negative": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "fine_sync_section",
+   "fieldtype": "Section Break",
+   "label": "Traffic Fine Sync"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_scheduled_fine_sync",
+   "fieldtype": "Check",
+   "label": "Enable Scheduled Fine Sync",
+   "description": "Off by default. Even when on, a sync only runs against portals that are enabled and hold a valid written authorization."
+  },
+  {
+   "fieldname": "column_break_fine_sync",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Company",
+   "fieldname": "imported_fine_responsibility",
+   "fieldtype": "Select",
+   "label": "Default Responsibility for Imported Fines",
+   "options": "Company\nDriver\nCustomer",
+   "description": "Applied to fines imported from a portal. Company is the safe default: assigning a Driver automatically would feed the black-points and blacklisting chain from data nobody has reviewed."
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-06 17:30:00.000000",
+ "modified": "2026-08-07 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Settings",

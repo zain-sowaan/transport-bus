@@ -201,6 +201,11 @@ scheduler_events = {
 	"daily": [
 		"transport.transport.doctype.compliance_document.compliance_document.refresh_status"
 	],
+	"daily_long": [
+		# Gated twice over: does nothing unless Transport Settings enables it,
+		# and then only runs against portals holding a valid authorization.
+		"transport.transport.fine_sync.service.run_scheduled_syncs"
+	],
 	"cron": {
 		# Every 5 minutes: fine enough granularity for a 20-min trip reminder
 		# and a 5-min driver-confirmation escalation window without being a

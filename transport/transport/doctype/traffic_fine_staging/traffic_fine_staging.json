@@ -1,0 +1,181 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "creation": "2026-08-07 12:00:00.000000",
+ "modified": "2026-08-07 12:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "module": "Transport",
+ "links": [],
+ "states": [],
+ "row_format": "Dynamic",
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "track_changes": 1,
+ "name": "Traffic Fine Staging",
+ "fields": [
+  {
+   "fieldname": "sync_run",
+   "fieldtype": "Link",
+   "options": "Traffic Fine Sync Run",
+   "label": "Sync Run",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "portal",
+   "fieldtype": "Link",
+   "options": "Traffic Fine Portal",
+   "label": "Portal",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "ticket_number",
+   "fieldtype": "Data",
+   "label": "Ticket Number",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "reqd": 1,
+   "default": "New",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "options": "New\nPromoted\nIgnored\nDuplicate"
+  },
+  {
+   "fieldname": "transport_traffic_fine",
+   "fieldtype": "Link",
+   "options": "Transport Traffic Fine",
+   "label": "Fine",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec1",
+   "fieldtype": "Section Break",
+   "label": "Fine Detail"
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "options": "Rental Vehicle",
+   "label": "Vehicle",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "plate",
+   "fieldtype": "Data",
+   "label": "Plate"
+  },
+  {
+   "fieldname": "fine_datetime",
+   "fieldtype": "Datetime",
+   "label": "Date / Time"
+  },
+  {
+   "fieldname": "col2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "fine_type",
+   "fieldtype": "Data",
+   "label": "Fine Type"
+  },
+  {
+   "fieldname": "fine_location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "fieldname": "black_points",
+   "fieldtype": "Int",
+   "label": "Black Points (Reported)",
+   "description": "Points as reported by the authority, if provided. Not applied automatically."
+  },
+  {
+   "fieldname": "sec2",
+   "fieldtype": "Section Break",
+   "label": "Raw"
+  },
+  {
+   "fieldname": "raw_payload",
+   "fieldtype": "Code",
+   "label": "Raw Payload",
+   "read_only": 1,
+   "description": "Exactly what the portal returned for this row, kept so a mapping error can be diagnosed without re-querying."
+  }
+ ],
+ "field_order": [
+  "sync_run",
+  "portal",
+  "ticket_number",
+  "col1",
+  "status",
+  "transport_traffic_fine",
+  "sec1",
+  "vehicle",
+  "plate",
+  "fine_datetime",
+  "col2",
+  "amount",
+  "fine_type",
+  "fine_location",
+  "black_points",
+  "sec2",
+  "raw_payload"
+ ],
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Accounts",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Operations",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "autoname": "TR-TFST-.YYYY.-.MM.-.#####",
+ "title_field": "ticket_number"
+}

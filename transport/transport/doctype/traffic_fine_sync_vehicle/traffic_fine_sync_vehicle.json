@@ -1,0 +1,67 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "creation": "2026-08-07 12:00:00.000000",
+ "modified": "2026-08-07 12:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "module": "Transport",
+ "links": [],
+ "states": [],
+ "row_format": "Dynamic",
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "track_changes": 1,
+ "name": "Traffic Fine Sync Vehicle",
+ "fields": [
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "options": "Rental Vehicle",
+   "label": "Vehicle",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "plate",
+   "fieldtype": "Data",
+   "label": "Plate",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "in_list_view": 1,
+   "columns": 1,
+   "options": "Success\nFailed\nSkipped"
+  },
+  {
+   "fieldname": "fines_found",
+   "fieldtype": "Int",
+   "label": "Fines",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "label": "Message",
+   "in_list_view": 1,
+   "columns": 4
+  }
+ ],
+ "field_order": [
+  "vehicle",
+  "plate",
+  "status",
+  "fines_found",
+  "message"
+ ],
+ "permissions": [],
+ "sort_field": "idx",
+ "sort_order": "ASC",
+ "istable": 1
+}
