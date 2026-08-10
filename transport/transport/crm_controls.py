@@ -19,40 +19,17 @@ def enforce_lost_reason(doc, method=None):
 # pasted straight out of the customer's table, and the marker is not data.
 BULLET_CHARS = "•●▪‣⁃·-*–— \t"
 
-TBA = "TBA"
-# What customers actually write when the time is not settled yet.
-TBA_SYNONYMS = {"tba", "tbc", "tbd", "tba.", "to be advised", "to be confirmed", "n/a", "-", "--"}
-
-
-def normalize_time_text(value):
-	"""Tidy a time written by a customer, without ever discarding it.
-
-	Returns a canonical 24-hour "HH:MM" when the text parses as a time, the
-	literal "TBA" when it is blank or one of the ways people say "not yet",
-	and otherwise exactly what was typed. That last case is the important
-	one: enquiries carry things like "before 07:30" or "after prayers", and
-	rewriting those into something tidier would change the customer's terms.
-	"""
-	text = (value or "").strip()
-	if not text or text.lower() in TBA_SYNONYMS:
-		return TBA
-
-	try:
-		parsed = frappe.utils.get_time(text)
-	except Exception:
-		return text
-
-	return parsed.strftime("%H:%M") if parsed else text
-
-
 def normalize_enquiry_schedule(doc, method=None):
 	"""Tidy and check the requested shuttle schedule on an Opportunity.
 
 	Deliberately light: an enquiry records what the customer asked for, not
 	what we have agreed to, so locations stay free text and an unsettled
-	schedule saves happily. The single thing actually enforced is that a batch
-	does not name the same day twice, which is a transcription error rather
-	than a schedule anyone meant.
+	schedule saves happily. Times are left exactly as entered - Frappe parses
+	a Datetime itself, and an unstated one stays empty because the field
+	declares no default.
+
+	The single thing actually enforced is that a day is not listed twice,
+	which is a transcription error rather than a schedule anyone meant.
 	"""
 	rows = doc.get("transport_enquiry_schedule")
 	if not rows:
@@ -60,9 +37,6 @@ def normalize_enquiry_schedule(doc, method=None):
 
 	seen = {}
 	for row in rows:
-		row.pickup_time = normalize_time_text(row.pickup_time)
-		row.dropoff_time = normalize_time_text(row.dropoff_time)
-
 		if row.pickup_points:
 			row.pickup_points = "\n".join(
 				line
@@ -75,15 +49,14 @@ def normalize_enquiry_schedule(doc, method=None):
 		if not row.day:
 			continue
 
-		key = ((row.batch or "").strip().lower(), row.day)
-		if key in seen:
+		if row.day in seen:
 			frappe.throw(
-				_("Rows {0} and {1} both set {2} for batch {3}. Each day may appear once per batch.").format(
-					seen[key], row.idx, row.day, row.batch or _("(no batch)")
+				_("Rows {0} and {1} both set {2}. Each day may appear once.").format(
+					seen[row.day], row.idx, row.day
 				),
 				title=_("Duplicate Day"),
 			)
-		seen[key] = row.idx
+		seen[row.day] = row.idx
 
 
 def sync_transport_project(doc, method=None):
