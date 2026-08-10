@@ -7,15 +7,16 @@ frappe.ui.form.on("Transport Rate Calculation", {
 			return;
 		}
 
-		if (!frm.doc.customer || !frm.doc.final_price) {
+		if (!frm.doc.customer || !frm.doc.total_final_price) {
 			return;
 		}
 
 		frm.add_custom_button(__("Create Quotation"), () => {
 			frappe.confirm(
-				__("Create a Quotation for {0} at {1}?", [
+				__("Create a Quotation for {0} covering {1} vehicle(s), totalling {2}?", [
 					frm.doc.customer,
-					format_currency(frm.doc.final_price),
+					(frm.doc.vehicles || []).length,
+					format_currency(frm.doc.total_final_price),
 				]),
 				() => {
 					frm.call("create_quotation").then((r) => {
