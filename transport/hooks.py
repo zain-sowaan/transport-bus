@@ -217,7 +217,15 @@ scheduler_events = {
 # does not. This makes it mandatory, per the source document.
 
 doc_events = {
-	"Opportunity": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
+	"Opportunity": {
+		"validate": [
+			"transport.transport.crm_controls.enforce_lost_reason",
+			# The requested shuttle schedule lives on Opportunity as a Custom
+			# Field table - tidied and checked here, since a child doctype's own
+			# validate() is not run by the parent's save.
+			"transport.transport.crm_controls.normalize_enquiry_schedule",
+		]
+	},
 	"Quotation": {"validate": "transport.transport.crm_controls.enforce_lost_reason"},
 	"Sales Order": {
 		"validate": "transport.transport.crm_controls.sync_transport_project",

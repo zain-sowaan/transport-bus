@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-10 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "batch",
+  "day",
+  "pickup_time",
+  "dropoff_time",
+  "no_of_pax",
+  "pickup_points",
+  "dropoff_location"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "default": "Batch 1",
+   "description": "Enquiries often quote several batches - one per vehicle or route. Keep them in this one table and separate them by batch.",
+   "fieldname": "batch",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Batch"
+  },
+  {
+   "columns": 1,
+   "fieldname": "day",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Day",
+   "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "description": "A time, or TBA. Deliberately not a Time field: Frappe fills any blank Time on a new document with the current clock time before validation can see it, so \"to be advised\" - which is what customers actually send - would silently become a real-looking time nobody typed.",
+   "fieldname": "pickup_time",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Pick-up Time"
+  },
+  {
+   "columns": 1,
+   "fieldname": "dropoff_time",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Drop-off Time"
+  },
+  {
+   "columns": 1,
+   "fieldname": "no_of_pax",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "No. of Pax",
+   "non_negative": 1
+  },
+  {
+   "columns": 2,
+   "description": "One location per line - these are the bullet points from the customer's own table. Free text on purpose: an enquiry names places that may not be in the Place master yet, and may never be if the enquiry is lost.",
+   "fieldname": "pickup_points",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Pick-up Point Location",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "dropoff_location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Drop-off Point Location"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-10 11:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Transport Enquiry Schedule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
