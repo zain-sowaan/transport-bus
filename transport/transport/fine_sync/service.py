@@ -21,7 +21,8 @@ from frappe import _
 from frappe.utils import now_datetime
 
 from transport.transport.fine_sync.base import FineFetchError
-from transport.transport.fine_sync.registry import get_fetcher
+from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
+from transport.transport.fine_sync.registry import get_fetcher, is_supported
 from transport.transport.vehicle_plate import PLATE_FIELDS
 
 SYNC_ROLES = ("Transport Accounts", "Transport Operations", "System Manager")
@@ -328,11 +329,25 @@ def capture_portal_page(portal):
 			title=_("Authorization Required"),
 		)
 
-	fetcher = get_fetcher(portal_doc)
+	# Capture is the step that comes BEFORE a portal has a fetcher, so it must
+	# not require one - demanding a fetcher first is circular. It locked capture
+	# out of the 6 portals with neither a fetcher_key nor the MOI route (RAKTA,
+	# RTA, DARB, TAMM, Dubai Police, EVG), which are exactly the ones whose
+	# contract is still unknown and most need capturing. A portal-specific
+	# fetcher is used when one exists (it may know a better entry point);
+	# otherwise the generic browser suffices, since capture_page() only reads a
+	# public URL and the resulting DOM.
+	if is_supported(portal_doc):
+		fetcher = get_fetcher(portal_doc)
+	else:
+		fetcher = BrowserFetcher(portal_doc)
+
 	try:
 		report = fetcher.capture_page()
 	finally:
 		fetcher.close()
+
+	report["fetcher_used"] = type(fetcher).__name__
 
 	# The page body is useful for writing selectors but far too big to show.
 	html = report.pop("html", "")
