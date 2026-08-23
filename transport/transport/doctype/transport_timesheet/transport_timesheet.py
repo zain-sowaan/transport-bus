@@ -257,6 +257,18 @@ class TransportTimesheet(Document):
 		invoice.transport_timesheet = self.name
 		invoice.grn_status = "Pending"
 		invoice.invoice_submission_status = "Not Submitted"
+
+		# A transport contract is one long-lived Sales Order invoiced every
+		# month, and make_sales_invoice() copies the order's payment schedule
+		# as-is. That schedule's due date is fixed at the order's own date, so
+		# from the second month onward ERPNext rejects the invoice with "Due
+		# Date cannot be before Posting Date" - the contract would invoice once
+		# and then break. Clearing both lets accounts_controller rebuild the
+		# schedule from this invoice's posting date and the customer's payment
+		# terms, which is what a monthly billing run actually needs.
+		invoice.payment_schedule = []
+		invoice.due_date = None
+
 		self.add_weekend_holiday_charges(invoice)
 		invoice.insert()
 
