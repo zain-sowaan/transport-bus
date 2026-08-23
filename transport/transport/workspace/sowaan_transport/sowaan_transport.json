@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\": \"hdr_main\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Sowaan Transport</b></span>\", \"col\": 12}}, {\"id\": \"par_main\", \"type\": \"paragraph\", \"data\": {\"text\": \"Corporate transport contracting \\u2014 enquiry through to invoicing, fleet compliance and traffic fines.\", \"col\": 12}}, {\"id\": \"sp_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hdr_qa\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Access</b></span>\", \"col\": 12}}, {\"id\": \"sc_0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transport Rate Calculation\", \"col\": 3}}, {\"id\": \"sc_1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trip Schedule\", \"col\": 3}}, {\"id\": \"sc_2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trip\", \"col\": 3}}, {\"id\": \"sc_3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transport Timesheet\", \"col\": 3}}, {\"id\": \"sc_4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Rental Vehicle\", \"col\": 3}}, {\"id\": \"sc_5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transport Settings\", \"col\": 3}}, {\"id\": \"sp_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hdr_mod\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"cd_0\", \"type\": \"card\", \"data\": {\"card_name\": \"Enquiry & Quotation\", \"col\": 4}}, {\"id\": \"cd_1\", \"type\": \"card\", \"data\": {\"card_name\": \"Planning & Scheduling\", \"col\": 4}}, {\"id\": \"cd_2\", \"type\": \"card\", \"data\": {\"card_name\": \"Trip Execution\", \"col\": 4}}, {\"id\": \"cd_3\", \"type\": \"card\", \"data\": {\"card_name\": \"Timesheet & Billing\", \"col\": 4}}, {\"id\": \"cd_4\", \"type\": \"card\", \"data\": {\"card_name\": \"Fleet\", \"col\": 4}}, {\"id\": \"cd_5\", \"type\": \"card\", \"data\": {\"card_name\": \"Drivers\", \"col\": 4}}, {\"id\": \"cd_6\", \"type\": \"card\", \"data\": {\"card_name\": \"Traffic Fines\", \"col\": 4}}, {\"id\": \"cd_7\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}, {\"id\": \"cd_8\", \"type\": \"card\", \"data\": {\"card_name\": \"Setup\", \"col\": 4}}]",
+ "content": "[{\"id\": \"hdr_main\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Sowaan Transport</b></span>\", \"col\": 12}}, {\"id\": \"par_main\", \"type\": \"paragraph\", \"data\": {\"text\": \"Corporate transport contracting \\u2014 enquiry through to invoicing, fleet compliance and traffic fines.\", \"col\": 12}}, {\"id\": \"sp_1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"twhdr01\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>At a Glance</b></span>\", \"col\": 12}}, {\"id\": \"twcard00\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Trips Today\", \"col\": 4}}, {\"id\": \"twcard01\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Expenses Pending Approval\", \"col\": 4}}, {\"id\": \"twcard02\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Open Customer Requests\", \"col\": 4}}, {\"id\": \"twcard03\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Pending Invoices Amount\", \"col\": 4}}, {\"id\": \"twcard04\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Loss-Making Projects\", \"col\": 4}}, {\"id\": \"twcard05\", \"type\": \"number_card\", \"data\": {\"number_card_name\": \"Fleet Utilization Percent\", \"col\": 4}}, {\"id\": \"twspc01\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hdr_qa\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Quick Access</b></span>\", \"col\": 12}}, {\"id\": \"sc_0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transport Rate Calculation\", \"col\": 3}}, {\"id\": \"sc_1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trip Schedule\", \"col\": 3}}, {\"id\": \"sc_2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Trip\", \"col\": 3}}, {\"id\": \"sc_3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transport Timesheet\", \"col\": 3}}, {\"id\": \"sc_4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Rental Vehicle\", \"col\": 3}}, {\"id\": \"sc_5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Transport Settings\", \"col\": 3}}, {\"id\": \"sp_2\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"hdr_mod\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"cd_0\", \"type\": \"card\", \"data\": {\"card_name\": \"Enquiry & Quotation\", \"col\": 4}}, {\"id\": \"cd_1\", \"type\": \"card\", \"data\": {\"card_name\": \"Planning & Scheduling\", \"col\": 4}}, {\"id\": \"cd_2\", \"type\": \"card\", \"data\": {\"card_name\": \"Trip Execution\", \"col\": 4}}, {\"id\": \"cd_3\", \"type\": \"card\", \"data\": {\"card_name\": \"Timesheet & Billing\", \"col\": 4}}, {\"id\": \"cd_4\", \"type\": \"card\", \"data\": {\"card_name\": \"Fleet\", \"col\": 4}}, {\"id\": \"cd_5\", \"type\": \"card\", \"data\": {\"card_name\": \"Drivers\", \"col\": 4}}, {\"id\": \"cd_6\", \"type\": \"card\", \"data\": {\"card_name\": \"Traffic Fines\", \"col\": 4}}, {\"id\": \"cd_7\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}, {\"id\": \"cd_8\", \"type\": \"card\", \"data\": {\"card_name\": \"Setup\", \"col\": 4}}]",
  "creation": "2026-08-05 09:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -480,11 +480,36 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-07 17:00:00.000000",
+ "modified": "2026-08-22 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Sowaan Transport",
- "number_cards": [],
+ "number_cards": [
+  {
+   "label": "Trips Today",
+   "number_card_name": "Trips Today"
+  },
+  {
+   "label": "Expenses Pending Approval",
+   "number_card_name": "Expenses Pending Approval"
+  },
+  {
+   "label": "Open Customer Requests",
+   "number_card_name": "Open Customer Requests"
+  },
+  {
+   "label": "Pending Invoices Amount",
+   "number_card_name": "Pending Invoices Amount"
+  },
+  {
+   "label": "Loss-Making Projects",
+   "number_card_name": "Loss-Making Projects"
+  },
+  {
+   "label": "Fleet Utilization %",
+   "number_card_name": "Fleet Utilization Percent"
+  }
+ ],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
