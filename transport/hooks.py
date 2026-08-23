@@ -30,17 +30,6 @@ fixtures = [
 		"doctype": "Client Script",
 		"filters": {"module": "Transport"},
 	},
-	{
-		# Matched to Trip Expense.expense_type's Select options exactly -
-		# Expense Claim Type's autoname is field:expense_type, so the name
-		# IS the mapping, no lookup table needed.
-		"doctype": "Expense Claim Type",
-		# "Others" is deliberately excluded: on this site it's a pre-existing
-		# site record this app doesn't own, already configured with real
-		# per-company GL accounts - fixture-syncing it would silently
-		# overwrite that live config with whatever ships in this repo.
-		"filters": [["name", "in", ["Fuel", "Salik / Toll", "Parking", "Maintenance"]]],
-	},
 ]
 
 # Apps
@@ -124,8 +113,14 @@ required_apps = ["fleetify", "hrms"]
 # Installation
 # ------------
 
+# Expense Claim Types are seeded here rather than shipped as a fixture:
+# fixture sync deletes and re-inserts, wiping the per-company GL accounts
+# mapped against them. transport/patches/seed_expense_claim_types.py covers
+# sites that already have this app; install marks patches done without
+# running them, so a new site needs this hook too.
+after_install = "transport.setup.after_install"
+
 # before_install = "transport.install.before_install"
-# after_install = "transport.install.after_install"
 
 # Uninstallation
 # ------------
