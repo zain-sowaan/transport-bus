@@ -13,3 +13,4 @@ transport.patches.set_transport_settings_defaults_p9
 transport.patches.seed_traffic_fine_portals
 transport.patches.move_rate_calculation_to_vehicle_rows
 transport.patches.seed_expense_claim_types
+transport.patches.update_srta_verified_reference
