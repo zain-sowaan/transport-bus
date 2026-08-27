@@ -226,6 +226,12 @@ doc_events = {
 		"validate": "transport.transport.crm_controls.sync_transport_project",
 		"on_submit": "transport.transport.crm_controls.notify_operations_on_sales_order",
 	},
+	# The per-shift contract terms live on Project as a Custom Field table, so
+	# their coherence has to be checked from the parent - Frappe does not run a
+	# child doctype's validate() during the parent's save.
+	"Project": {
+		"validate": "transport.transport.doctype.transport_project_shift.transport_project_shift.validate_project_shifts"
+	},
 	# Rental Vehicle is fleetify's doctype - extended here via Custom Field
 	# fixtures plus this event, never by editing their files.
 	"Rental Vehicle": {"validate": "transport.transport.vehicle_plate.normalize_plate"},

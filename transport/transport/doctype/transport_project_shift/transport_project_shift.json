@@ -1,0 +1,112 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-24 15:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "shift",
+  "weekend_payment",
+  "public_holiday_payment",
+  "salik_darb",
+  "salik_rate",
+  "darb_rate",
+  "fuel",
+  "fuel_arrangement",
+  "show_consumed_fuel_on_invoice",
+  "driver_accommodation"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "fieldname": "shift",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Shift",
+   "options": "Morning\nAfternoon\nEvening",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "description": "Excluding means the weekend charge is billed to the customer on top of the monthly value; Including means it is absorbed in that value.",
+   "fieldname": "weekend_payment",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Weekend Payment",
+   "options": "\nIncluding\nExcluding"
+  },
+  {
+   "columns": 1,
+   "fieldname": "public_holiday_payment",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Public Holiday Payment",
+   "options": "\nIncluding\nExcluding"
+  },
+  {
+   "columns": 1,
+   "description": "Whether road tolls are absorbed in the monthly value or recharged to the customer.",
+   "fieldname": "salik_darb",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Salik & Darb",
+   "options": "\nIncluding\nExcluding"
+  },
+  {
+   "columns": 1,
+   "description": "Per-crossing Salik rate for this contract. Deliberately not defaulted: Dubai moved to peak/off-peak pricing and a 5% VAT applies to Salik from 1 June 2026, so the figure on a contract sheet may be out of date. Confirm the current rate with the client before invoicing.",
+   "fieldname": "salik_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Salik Rate"
+  },
+  {
+   "columns": 1,
+   "fieldname": "darb_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Darb Rate"
+  },
+  {
+   "fieldname": "fuel",
+   "fieldtype": "Select",
+   "label": "Fuel",
+   "options": "\nIncluding\nExcluding"
+  },
+  {
+   "depends_on": "eval:doc.fuel==\"Excluding\"",
+   "description": "Only meaningful when fuel is excluded, and the two differ commercially: supplied by the client costs us nothing, whereas company-supplied fuel is recharged.",
+   "fieldname": "fuel_arrangement",
+   "fieldtype": "Select",
+   "label": "If Fuel Excluding",
+   "options": "\nFuel from Client\nFuel from Company, Reimbursed by Client"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.fuel_arrangement==\"Fuel from Company, Reimbursed by Client\"",
+   "description": "Shows the total cost of consumed fuel as a line on the customer invoice.",
+   "fieldname": "show_consumed_fuel_on_invoice",
+   "fieldtype": "Check",
+   "label": "Show Consumed Fuel on Client Invoice"
+  },
+  {
+   "fieldname": "driver_accommodation",
+   "fieldtype": "Select",
+   "label": "Driver Accommodation",
+   "options": "\nIncluding\nExcluding"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-24 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Transport Project Shift",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
