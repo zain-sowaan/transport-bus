@@ -18,15 +18,20 @@ Two consequences of that shape are deliberate:
   are paying for each vehicle type rather than a single opaque figure.
 
 `total_estimated_cost` stays on the parent because the Project P&L report
-reads it directly; it now means the total across all vehicles.
+reads it directly; it means the total across every vehicle, each multiplied
+by how many of that vehicle the contract calls for.
 """
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, nowdate
+from frappe.utils import cint, flt, nowdate
 
 QUOTATION_ROLES = ("Transport Operations", "System Manager")
+
+# Weekends excluded. The client's sheet uses 26 for most rows; it is a field
+# on every vehicle so a seven-day contract can say 30 instead.
+DEFAULT_WORKING_DAYS = 26
 
 COST_COMPONENTS = (
 	"vehicle_rental_cost",
@@ -62,6 +67,24 @@ class TransportRateCalculation(Document):
 				row.driver_salary_cost = 0
 				row.room_rent_cost = 0
 
+			# The client's sheet quotes running per day and costs per month, so
+			# the monthly figures are derived rather than typed twice. Working
+			# days is explicit because the sheet itself is inconsistent about it
+			# - some rows multiply by 26, one by 30 - and a hidden constant would
+			# silently disagree with whichever the estimator had in mind.
+			days = cint(row.working_days_per_month) or DEFAULT_WORKING_DAYS
+			row.working_days_per_month = days
+			for per_day, per_month in (
+				("km_per_day", "estimated_km"),
+				("trips_per_day", "estimated_trips_per_month"),
+			):
+				if flt(row.get(per_day)):
+					row.set(per_month, flt(row.get(per_day)) * days)
+				elif flt(row.get(per_month)):
+					# A row that predates the per-day fields already has a monthly
+					# figure. Work backwards rather than overwriting it with zero.
+					row.set(per_day, flt(row.get(per_month)) / days)
+
 			row.total_estimated_cost = sum(flt(row.get(f)) for f in COST_COMPONENTS)
 			row.cost_per_trip = (
 				row.total_estimated_cost / row.estimated_trips_per_month
@@ -75,10 +98,22 @@ class TransportRateCalculation(Document):
 			row.minimum_price = row.total_estimated_cost * (1 + flt(row.minimum_margin_percent) / 100)
 			row.final_price = flt(row.proposed_price) * (1 - flt(row.discount_percent) / 100)
 
-		self.total_estimated_cost = sum(flt(r.total_estimated_cost) for r in self.vehicles)
-		self.total_minimum_price = sum(flt(r.minimum_price) for r in self.vehicles)
-		self.total_proposed_price = sum(flt(r.proposed_price) for r in self.vehicles)
-		self.total_final_price = sum(flt(r.final_price) for r in self.vehicles)
+			# Every figure above describes ONE vehicle - that is how the sheet is
+			# costed and how the margin has to be checked. A quotation for two
+			# identical buses is the same line twice over, so the multiplication
+			# happens here and nowhere else.
+			qty = cint(row.qty) or 1
+			row.qty = qty
+			row.line_total_cost = row.total_estimated_cost * qty
+			row.line_minimum_price = row.minimum_price * qty
+			row.line_proposed_price = flt(row.proposed_price) * qty
+			row.line_final_price = row.final_price * qty
+			row.line_margin = row.line_final_price - row.line_total_cost
+
+		self.total_estimated_cost = sum(flt(r.line_total_cost) for r in self.vehicles)
+		self.total_minimum_price = sum(flt(r.line_minimum_price) for r in self.vehicles)
+		self.total_proposed_price = sum(flt(r.line_proposed_price) for r in self.vehicles)
+		self.total_final_price = sum(flt(r.line_final_price) for r in self.vehicles)
 		self.total_margin = self.total_final_price - self.total_estimated_cost
 		self.total_margin_percent = (
 			self.total_margin / self.total_estimated_cost * 100 if self.total_estimated_cost else 0
@@ -116,7 +151,10 @@ class TransportRateCalculation(Document):
 			parts.append(row.with_driver)
 		if row.with_fuel:
 			parts.append(row.with_fuel)
-		return " - ".join(p for p in parts if p)
+		label = " - ".join(p for p in parts if p)
+		if row.route_from or row.route_to:
+			label += _(" ({0} to {1})").format(row.route_from or "?", row.route_to or "?")
+		return label
 
 	@frappe.whitelist()
 	def create_quotation(self):
@@ -141,7 +179,7 @@ class TransportRateCalculation(Document):
 					{
 						"item_code": service_item,
 						"description": self.describe_vehicle(row),
-						"qty": 1,
+						"qty": cint(row.qty) or 1,
 						"rate": row.final_price,
 					}
 					for row in self.vehicles

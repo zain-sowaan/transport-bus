@@ -6,11 +6,22 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "vehicle_section",
   "vehicle_category",
   "seating_capacity",
+  "qty",
+  "column_break_vehicle",
   "with_driver",
   "with_fuel",
-  "column_break_requirement",
+  "route_section",
+  "route_from",
+  "route_to",
+  "weekend_trips",
+  "column_break_route",
+  "km_per_day",
+  "trips_per_day",
+  "working_days_per_month",
+  "column_break_derived",
   "estimated_km",
   "estimated_trips_per_month",
   "cost_section",
@@ -21,35 +32,57 @@
   "driver_salary_cost",
   "room_rent_cost",
   "maintenance_cost",
-  "totals_section",
+  "column_break_costtotal",
   "total_estimated_cost",
   "cost_per_trip",
-  "column_break_totals",
+  "price_section",
   "minimum_margin_percent",
   "minimum_price",
-  "pricing_section",
+  "column_break_price",
   "proposed_price",
   "discount_percent",
-  "column_break_pricing",
-  "final_price"
+  "final_price",
+  "line_section",
+  "line_total_cost",
+  "line_minimum_price",
+  "column_break_line",
+  "line_proposed_price",
+  "line_final_price",
+  "line_margin"
  ],
  "fields": [
   {
-   "columns": 1,
-   "fieldname": "vehicle_category",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Vehicle Category",
-   "options": "\nPassenger\nGoods\nDouble Cabin",
-   "reqd": 1
+   "fieldname": "vehicle_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle"
   },
   {
-   "columns": 1,
+   "fieldname": "vehicle_category",
+   "fieldtype": "Select",
+   "label": "Vehicle Category",
+   "options": "\nPassenger\nGoods\nDouble Cabin",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
    "fieldname": "seating_capacity",
    "fieldtype": "Select",
-   "in_list_view": 1,
    "label": "Seating Capacity",
-   "options": "\n5\n7\n13\n34\n55\n65"
+   "options": "\n5\n7\n9\n12\n13\n14\n26\n33\n34\n55\n65\n66",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Int",
+   "label": "No. of Vehicles",
+   "default": "1",
+   "description": "How many vehicles of this type. Costs and prices below are for ONE vehicle; the line totals multiply by this."
+  },
+  {
+   "fieldname": "column_break_vehicle",
+   "fieldtype": "Column Break"
   },
   {
    "default": "With Driver",
@@ -68,20 +101,70 @@
    "reqd": 1
   },
   {
-   "fieldname": "column_break_requirement",
+   "fieldname": "route_section",
+   "fieldtype": "Section Break",
+   "label": "Route & Running"
+  },
+  {
+   "fieldname": "route_from",
+   "fieldtype": "Data",
+   "label": "From",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "route_to",
+   "fieldtype": "Data",
+   "label": "To",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "weekend_trips",
+   "fieldtype": "Select",
+   "label": "Weekend Trips",
+   "options": "\nIncluded\nExcluded"
+  },
+  {
+   "fieldname": "column_break_route",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "km_per_day",
+   "fieldtype": "Float",
+   "label": "KM per Day"
+  },
+  {
+   "fieldname": "trips_per_day",
+   "fieldtype": "Float",
+   "label": "Trips per Day",
+   "description": "Count a round trip as the number of trips you bill it as - the sheet's \"01 Round Trip\" is entered here as you price it."
+  },
+  {
+   "fieldname": "working_days_per_month",
+   "fieldtype": "Int",
+   "label": "Working Days / Month",
+   "default": "26",
+   "description": "Used to turn per-day KM and trips into monthly figures. 26 excludes weekends, 30 includes them."
+  },
+  {
+   "fieldname": "column_break_derived",
    "fieldtype": "Column Break"
   },
   {
    "fieldname": "estimated_km",
    "fieldtype": "Float",
-   "label": "Estimated KM"
+   "label": "KM per Month",
+   "read_only": 1,
+   "description": "KM per Day x Working Days / Month."
   },
   {
-   "description": "Used to derive Cost per Trip. For a one-time trip, leave as 1.",
+   "description": "Trips per Day x Working Days / Month.",
    "fieldname": "estimated_trips_per_month",
    "fieldtype": "Int",
    "label": "Estimated Trips / Month",
-   "non_negative": 1
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "fieldname": "cost_section",
@@ -91,13 +174,17 @@
   {
    "fieldname": "vehicle_rental_cost",
    "fieldtype": "Currency",
-   "label": "Vehicle Rental / Loan Cost"
+   "label": "Vehicle Rental / Loan Cost",
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "depends_on": "eval:doc.with_fuel=='With Fuel'",
    "fieldname": "fuel_cost",
    "fieldtype": "Currency",
-   "label": "Fuel Cost"
+   "label": "Fuel Cost",
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "fieldname": "salik_toll_parking_cost",
@@ -112,7 +199,9 @@
    "depends_on": "eval:doc.with_driver=='With Driver'",
    "fieldname": "driver_salary_cost",
    "fieldtype": "Currency",
-   "label": "Driver Salary"
+   "label": "Driver Salary",
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "depends_on": "eval:doc.with_driver=='With Driver'",
@@ -127,17 +216,16 @@
    "label": "Maintenance Charges"
   },
   {
-   "fieldname": "totals_section",
-   "fieldtype": "Section Break",
-   "label": "Estimated Cost"
+   "fieldname": "column_break_costtotal",
+   "fieldtype": "Column Break"
   },
   {
-   "columns": 2,
    "fieldname": "total_estimated_cost",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "label": "Total Estimated Cost / Month",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "fieldname": "cost_per_trip",
@@ -146,8 +234,9 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_totals",
-   "fieldtype": "Column Break"
+   "fieldname": "price_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
   },
   {
    "description": "Defaults from Transport Settings; override per vehicle if needed.",
@@ -162,43 +251,76 @@
    "read_only": 1
   },
   {
-   "fieldname": "pricing_section",
-   "fieldtype": "Section Break",
-   "label": "Pricing"
-  },
-  {
-   "columns": 2,
-   "description": "The price you intend to quote for this vehicle, before discount.",
-   "fieldname": "proposed_price",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Proposed Price / Month",
-   "reqd": 1
-  },
-  {
-   "columns": 1,
-   "fieldname": "discount_percent",
-   "fieldtype": "Percent",
-   "in_list_view": 1,
-   "label": "Discount %"
-  },
-  {
-   "fieldname": "column_break_pricing",
+   "fieldname": "column_break_price",
    "fieldtype": "Column Break"
   },
   {
-   "columns": 2,
+   "description": "The price you intend to quote for this vehicle, before discount.",
+   "fieldname": "proposed_price",
+   "fieldtype": "Currency",
+   "label": "Proposed Price / Month",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "discount_percent",
+   "fieldtype": "Percent",
+   "label": "Discount %"
+  },
+  {
    "fieldname": "final_price",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "label": "Final Price / Month",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "line_section",
+   "fieldtype": "Section Break",
+   "label": "Line Totals"
+  },
+  {
+   "fieldname": "line_total_cost",
+   "fieldtype": "Currency",
+   "label": "Line Cost / Month",
+   "read_only": 1,
+   "description": "Estimated cost for one vehicle x No. of Vehicles."
+  },
+  {
+   "fieldname": "line_minimum_price",
+   "fieldtype": "Currency",
+   "label": "Line Minimum Price / Month",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_line",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "line_proposed_price",
+   "fieldtype": "Currency",
+   "label": "Line Proposed Price / Month",
+   "read_only": 1
+  },
+  {
+   "fieldname": "line_final_price",
+   "fieldtype": "Currency",
+   "label": "Line Final Price / Month",
+   "read_only": 1
+  },
+  {
+   "fieldname": "line_margin",
+   "fieldtype": "Currency",
+   "label": "Line Margin / Month",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-10 14:00:00.000000",
+ "modified": "2026-08-27 17:25:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Rate Calculation Vehicle",
