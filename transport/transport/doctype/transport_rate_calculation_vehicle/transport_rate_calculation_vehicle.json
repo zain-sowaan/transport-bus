@@ -123,7 +123,8 @@
    "fieldname": "weekend_trips",
    "fieldtype": "Select",
    "label": "Weekend Trips",
-   "options": "\nIncluded\nExcluded"
+   "options": "\nIncluded\nExcluded",
+   "description": "Records the contract term, straight off the price sheet. It does not drive any arithmetic - Working Days / Month does that. Set 30 days when weekends are Included, 26 when they are Excluded, so the two agree."
   },
   {
    "fieldname": "column_break_route",
@@ -145,7 +146,7 @@
    "fieldtype": "Int",
    "label": "Working Days / Month",
    "default": "26",
-   "description": "Used to turn per-day KM and trips into monthly figures. 26 excludes weekends, 30 includes them."
+   "description": "Turns per-day KM and trips into monthly figures. 26 excludes weekends, 30 includes them - keep it consistent with Weekend Trips."
   },
   {
    "fieldname": "column_break_derived",
@@ -320,7 +321,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-27 17:25:00.000000",
+ "modified": "2026-08-28 10:06:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Rate Calculation Vehicle",

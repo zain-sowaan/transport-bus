@@ -7,11 +7,11 @@
  "engine": "InnoDB",
  "field_order": [
   "day",
-  "no_of_pax",
   "pickup_time",
   "pickup_time_tba",
   "dropoff_time",
   "dropoff_time_tba",
+  "no_of_pax",
   "pickup_points",
   "dropoff_location"
  ],
@@ -22,14 +22,6 @@
    "label": "Day",
    "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
    "reqd": 1,
-   "in_list_view": 1,
-   "columns": 1
-  },
-  {
-   "fieldname": "no_of_pax",
-   "fieldtype": "Int",
-   "label": "No. of Pax",
-   "non_negative": 1,
    "in_list_view": 1,
    "columns": 1
   },
@@ -62,7 +54,15 @@
    "fieldtype": "Check",
    "default": "0",
    "label": "Drop-off TBA",
-   "description": "The customer has not advised this time yet. Tick this instead of inventing one - it clears the time above."
+   "description": "The customer has not advised this time yet. Tick this instead of inventing one - it clears the time above. Open the row to reach it; the customer's own table marks only the pick-up as TBA."
+  },
+  {
+   "fieldname": "no_of_pax",
+   "fieldtype": "Int",
+   "label": "No. of Pax",
+   "non_negative": 1,
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "description": "One location per line - these are the bullet points from the customer's own table. Free text on purpose: an enquiry names places that may not be in the Place master yet, and may never be if the enquiry is lost.",
@@ -76,13 +76,15 @@
   {
    "fieldname": "dropoff_location",
    "fieldtype": "Data",
-   "label": "Drop-off Point Location"
+   "label": "Drop-off Point Location",
+   "in_list_view": 1,
+   "columns": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-27 17:40:00.000000",
+ "modified": "2026-08-28 10:05:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Enquiry Schedule",
