@@ -7,66 +7,82 @@
  "engine": "InnoDB",
  "field_order": [
   "day",
-  "pickup_time",
-  "dropoff_time",
   "no_of_pax",
+  "pickup_time",
+  "pickup_time_tba",
+  "dropoff_time",
+  "dropoff_time_tba",
   "pickup_points",
   "dropoff_location"
  ],
  "fields": [
   {
-   "columns": 1,
    "fieldname": "day",
    "fieldtype": "Select",
-   "in_list_view": 1,
    "label": "Day",
    "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
-   "reqd": 1
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 1
   },
   {
-   "columns": 2,
+   "fieldname": "no_of_pax",
+   "fieldtype": "Int",
+   "label": "No. of Pax",
+   "non_negative": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
    "description": "No default is declared on purpose. Frappe only auto-fills a Datetime when its default is literally \"now\", so leaving it undeclared is what keeps an unstated time genuinely empty rather than the moment the row was created.",
    "fieldname": "pickup_time",
    "fieldtype": "Datetime",
+   "label": "Pick-up Time",
    "in_list_view": 1,
-   "label": "Pick-up Time"
+   "columns": 2
   },
   {
-   "columns": 2,
+   "fieldname": "pickup_time_tba",
+   "fieldtype": "Check",
+   "default": "0",
+   "label": "Pick-up TBA",
+   "description": "The customer has not advised this time yet. Tick this instead of inventing one - it clears the time above.",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
    "fieldname": "dropoff_time",
    "fieldtype": "Datetime",
+   "label": "Drop-off Time",
    "in_list_view": 1,
-   "label": "Drop-off Time"
+   "columns": 2
   },
   {
-   "columns": 1,
-   "fieldname": "no_of_pax",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "No. of Pax",
-   "non_negative": 1
+   "fieldname": "dropoff_time_tba",
+   "fieldtype": "Check",
+   "default": "0",
+   "label": "Drop-off TBA",
+   "description": "The customer has not advised this time yet. Tick this instead of inventing one - it clears the time above."
   },
   {
-   "columns": 2,
    "description": "One location per line - these are the bullet points from the customer's own table. Free text on purpose: an enquiry names places that may not be in the Place master yet, and may never be if the enquiry is lost.",
    "fieldname": "pickup_points",
    "fieldtype": "Small Text",
-   "in_list_view": 1,
    "label": "Pick-up Point Location",
-   "reqd": 1
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2
   },
   {
-   "columns": 2,
    "fieldname": "dropoff_location",
    "fieldtype": "Data",
-   "in_list_view": 1,
    "label": "Drop-off Point Location"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-10 13:00:00.000000",
+ "modified": "2026-08-27 17:40:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Enquiry Schedule",

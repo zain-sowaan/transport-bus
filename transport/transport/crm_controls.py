@@ -26,7 +26,13 @@ def normalize_enquiry_schedule(doc, method=None):
 	what we have agreed to, so locations stay free text and an unsettled
 	schedule saves happily. Times are left exactly as entered - Frappe parses
 	a Datetime itself, and an unstated one stays empty because the field
-	declares no default.
+	declares no default. (A Time field would not survive this: Frappe fills
+	every blank one with the current time before validate ever runs, so
+	"not advised yet" and "happens now" become indistinguishable.)
+
+	Enquiries routinely arrive with a time marked TBA, so each time carries a
+	TBA flag. Ticking it clears the time, which keeps the pair from claiming
+	both that a time is unknown and what it is.
 
 	The single thing actually enforced is that a day is not listed twice,
 	which is a transcription error rather than a schedule anyone meant.
@@ -37,6 +43,12 @@ def normalize_enquiry_schedule(doc, method=None):
 
 	seen = {}
 	for row in rows:
+		# TBA means the customer has not said. Clear whatever sits in the field
+		# so the row cannot assert a time and its own absence at once.
+		for base in ("pickup_time", "dropoff_time"):
+			if row.get(base + "_tba"):
+				row.set(base, None)
+
 		if row.pickup_points:
 			row.pickup_points = "\n".join(
 				line
