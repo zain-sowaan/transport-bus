@@ -28,6 +28,29 @@ from transport.transport.vehicle_plate import PLATE_FIELDS
 SYNC_ROLES = ("Transport Accounts", "Transport Operations", "System Manager")
 
 
+def _checkpoint():
+	"""Commit what the run has recorded so far.
+
+	A fetch is minutes of browser work, and Frappe holds one transaction open for
+	a whole background job. Without these checkpoints the Sync Run and every fine
+	it stages sit inside that single transaction, which has three consequences:
+
+	* The naming-series rows for Traffic Fine Sync Run and Traffic Fine Staging
+	  stay locked for the entire fetch, so anything else trying to create one -
+	  the "Fetch Fines Now" button, the next scheduled fire - blocks and then
+	  dies with "Lock wait timeout exceeded".
+	* Nothing is visible while it happens. The run stays uncommitted, so an
+	  operator watching Traffic Fine Sync Run sees no sign it is running at all,
+	  which is exactly the doubt this module exists to settle.
+	* A worker killed mid-fetch loses every fine it had already read.
+
+	Committing means a later failure no longer rolls back earlier progress, and
+	that is deliberate: a run that read forty vehicles and then broke should keep
+	those forty and be marked failed, not discard them.
+	"""
+	frappe.db.commit()
+
+
 def _check_permission():
 	if not any(role in frappe.get_roles() for role in SYNC_ROLES):
 		frappe.throw(_("Not permitted to run a traffic-fine sync."), frappe.PermissionError)
@@ -153,6 +176,8 @@ def run_sync(portal, limit=None, vehicles=None):
 		"triggered_by": frappe.session.user,
 	})
 	run.insert(ignore_permissions=True)
+	# Release the naming-series lock before any browser work starts.
+	_checkpoint()
 
 	queryable, unqueryable = get_fleet_for_sync()
 
@@ -184,6 +209,10 @@ def run_sync(portal, limit=None, vehicles=None):
 		fetcher = get_fetcher(portal_doc, credential_doc)
 		for v in queryable:
 			_sync_one_vehicle(run, fetcher, portal_doc, v)
+			# Per vehicle, not per run: a fleet sweep is a browser page load each,
+			# so holding every staged fine back to the end means holding the
+			# staging series lock for the whole sweep.
+			_checkpoint()
 	except Exception:
 		# A failure setting up (or an unsupported portal) fails the whole run
 		# loudly rather than leaving it looking merely empty.
@@ -193,7 +222,12 @@ def run_sync(portal, limit=None, vehicles=None):
 	finally:
 		if fetcher:
 			fetcher.close()
+		# Before finalize, not only after: finalize() saves, and a save that
+		# throws would otherwise roll back the Failed status along with it,
+		# leaving no record at all of a run that broke.
+		_checkpoint()
 		run.finalize(error_log=error_log)
+		_checkpoint()
 
 	return {
 		"sync_run": run.name,
@@ -324,6 +358,9 @@ def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, w
 		"triggered_by": frappe.session.user,
 	})
 	run.insert(ignore_permissions=True)
+	# The sign-in wait alone runs to forty-five minutes. Nothing may sit in an
+	# open transaction across that.
+	_checkpoint()
 
 	fetcher, error_log, staged = None, None, 0
 	try:
@@ -351,6 +388,7 @@ def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, w
 				None if vehicle else _("No Rental Vehicle matches this plate - fine is unlinked."),
 				1,
 			)
+			_checkpoint()
 		run.fines_found = len(result.fines)
 		run.fines_new = staged
 	except Exception:
@@ -360,7 +398,12 @@ def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, w
 	finally:
 		if fetcher:
 			fetcher.close()
+		# Before finalize, not only after: finalize() saves, and a save that
+		# throws would otherwise roll back the Failed status along with it,
+		# leaving no record at all of a run that broke.
+		_checkpoint()
 		run.finalize(error_log=error_log)
+		_checkpoint()
 
 	return {
 		"sync_run": run.name,
@@ -420,7 +463,7 @@ def run_scheduled_operator_syncs():
 	  syncs, which ships off.
 	* **Never waits for a login.** A sign-in needs a UAE Pass push approved on a
 	  phone. Waiting for one on a schedule would leave a browser hung until the
-	  next fire, and at a 30-minute cadence those stack up until the box dies.
+	  next fire, and at a 45-minute cadence those stack up until the box dies.
 	  No live session simply means no run.
 	* **Never overlaps itself.** The lock is taken with a 1-second timeout, so a
 	  fire that finds one in progress gives up instead of queueing behind it.
