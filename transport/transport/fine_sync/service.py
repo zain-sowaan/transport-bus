@@ -621,6 +621,8 @@ def get_portal_session_status(portal):
 			"usable": False,
 			"fetch_implemented": False,
 			"can_capture": False,
+			"can_run_sync": False,
+			"can_capture_public": False,
 			"indicator": "orange",
 			"message": _(
 				"No fetcher is implemented for {0}, so fines cannot be collected from it "
@@ -635,6 +637,13 @@ def get_portal_session_status(portal):
 	)
 	status["fetch_implemented"] = bool(getattr(fetcher, "fetch_implemented", True))
 	status["can_capture"] = hasattr(fetcher, "capture_signed_in")
+	# Every button on the form is gated on one of these. They are answered here,
+	# together, because the form previously had two independent scripts each
+	# guessing at capability from the document alone - which is how Run Sync came
+	# to be offered on a portal with no fetcher, and Capture Page on one with no
+	# public form URL to capture.
+	status["can_run_sync"] = bool(portal_doc.is_enabled) and status["fetch_implemented"]
+	status["can_capture_public"] = bool(portal_doc.public_form_url)
 
 	if not status["fetch_implemented"]:
 		# Say what is actually missing. "No live session" would be true and

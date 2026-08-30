@@ -16,3 +16,4 @@ transport.patches.seed_expense_claim_types
 transport.patches.update_srta_verified_reference
 transport.patches.clear_fabricated_trip_actual_times
 transport.patches.rename_staging_last_seen_on
+transport.patches.remove_duplicate_portal_client_script
