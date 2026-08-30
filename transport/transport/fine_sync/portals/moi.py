@@ -55,10 +55,17 @@ fleet has no fines".
 
 import json
 import os
+import re
 
 import frappe
 
-from transport.transport.fine_sync.base import FineFetchError
+from frappe import _
+
+from transport.transport.fine_sync.base import (
+	AuthenticationRequired,
+	FetchedFine,
+	FetchResult,
+)
 from transport.transport.fine_sync.operator_fetcher import OperatorAssistedFetcher
 
 # Captured 2026-08-30: scode=486 resolves to "Payment of Vehicle Impound
@@ -109,6 +116,87 @@ INSPECT_JS = """
 """
 
 
+# The results table. Columns are mapped off the header row rather than by fixed
+# position: MOI's cells carry no identifying attributes at all - unlike TAMM's
+# data-id per column - so position is the only handle there is, and reading it
+# from the header at least survives a re-ordered table.
+EXTRACT_ROWS_JS = """
+() => {
+  const table = document.querySelector('#TicketsTable');
+  if (!table) return [];
+  const heads = [...table.querySelectorAll('th')].map(h => h.innerText.trim().toLowerCase());
+  const idx = name => heads.findIndex(h => h.includes(name));
+  const cell = td => {
+    const c = td.cloneNode(true);
+    // Every cell repeats its own column name in a hidden responsive label.
+    // Left in, the emirate name comes back with its own column heading glued
+    // in front of it, and every value in the table is wrong the same quiet way.
+    c.querySelectorAll('.mobileLbl').forEach(n => n.remove());
+    return c.innerText.trim();
+  };
+  // The plate is structured markup, not text. Reading innerText glues the
+  // category, the Arabic and English country wordmarks and the number into one
+  // unbroken run. Every plate carries data-plate-js holding the portal's own
+  // parse, which is what the fleet match needs.
+  const plateOf = td => {
+    const holder = td.querySelector('[data-plate-js]');
+    if (!holder) return { code: '', number: '', emirate: '', category: '' };
+    let info = {};
+    try { info = JSON.parse(holder.getAttribute('data-plate-js')) || {}; } catch (e) { info = {}; }
+    const panels = [...holder.querySelectorAll('.plate-holder > div')].map(d => d.innerText.trim());
+    return {
+      // Three panels: category, the country wordmark, then the number. The
+      // code is what a person reads as the plate's first group.
+      code: panels.length ? panels[0] : '',
+      number: info.PlateNo || holder.getAttribute('data-ticketplate-number') || '',
+      emirate: info.PlateSourceEnglishDesc || '',
+      category: info.PlateColorEnglishDesc || '',
+    };
+  };
+  const i = {
+    plate: idx('plate'), amount: idx('amount'), ticket: idx('fine number'),
+    when: idx('date'), source: idx('source'), points: idx('black'), status: idx('fine type'),
+  };
+  return [...table.querySelectorAll('tr')]
+    .filter(tr => tr.querySelectorAll('td').length >= 8)
+    .map(tr => {
+      const tds = [...tr.querySelectorAll('td')];
+      const at = k => (i[k] >= 0 && tds[i[k]]) ? cell(tds[i[k]]) : '';
+      return {
+        plate: (i.plate >= 0 && tds[i.plate]) ? plateOf(tds[i.plate]) : {},
+        amount: at('amount'), ticket: at('ticket'),
+        when: at('when'), source: at('source'), points: at('points'), status: at('status'),
+      };
+    })
+    .filter(r => r.ticket);
+}
+"""
+
+# DataTables here is client-side - no serverSide, no ajax - so paging is a DOM
+# swap and the next page can simply be clicked. Driven off the active page
+# number rather than a "next" arrow, because the arrow stays in the DOM at the
+# end of the list and clicking it silently does nothing.
+NEXT_PAGE_JS = """
+() => {
+  const pager = document.querySelector('#TicketsTable_paginate');
+  if (!pager) return false;
+  const active = pager.querySelector('.active a, .active, .current');
+  const current = active ? parseInt(active.innerText.trim(), 10) : 1;
+  if (!current) return false;
+  const target = [...pager.querySelectorAll('a')]
+    .find(a => parseInt(a.innerText.trim(), 10) === current + 1);
+  if (!target) return false;
+  target.click();
+  return true;
+}
+"""
+
+AMOUNT_RE = re.compile(r"([\d,]+(?:\.\d+)?)")
+# DD/MM/YYYY HH:MM. Read off the data, not assumed: across the captured page the
+# first component reaches 21 while the second never exceeds 8.
+DATETIME_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4})\D+(\d{1,2}):(\d{2})")
+
+
 class MoiFetcher(OperatorAssistedFetcher):
 	"""Operator-assisted, and capture-first: it records before it reads."""
 
@@ -121,10 +209,26 @@ class MoiFetcher(OperatorAssistedFetcher):
 	# button: the timeout is server-side and idle-based.
 	session_cookie_name = ".MOI.SSO.SS"
 
-	# No parse exists. This gates the Fetch Fines button so it never offers
-	# something that cannot happen - delete this line in the same edit that
-	# writes the real fetch.
-	fetch_implemented = False
+	# The parse is written against the markup captured on 2026-08-30, not
+	# against imagined selectors. What it still cannot do is *reach* the table
+	# unattended - the search carries its own CAPTCHA - so this fetcher is
+	# offered only where a person is present, and run_scheduled_operator_syncs
+	# will never queue it while fetch_for_traffic_file demands an operator.
+	fetch_implemented = True
+
+	# The search form carries its own CAPTCHA, so no banked session makes this
+	# unattended. Declared rather than discovered: without it the scheduled
+	# sweep would queue a job every 45 minutes that is guaranteed to fail, and
+	# fill the log with a failure that is really a design fact.
+	supports_unattended = False
+
+	# How long to wait for the operator to sign in, pick the company, enter the
+	# profile number and answer the CAPTCHA. Measured in minutes, like TAMM's.
+	results_timeout_ms = 2700000
+
+	# Two pages at 40 rows covered a 52-fine profile; this only bounds a pager
+	# that would otherwise cycle.
+	max_pages = 25
 
 	# A capture is a person driving the portal by hand: entering an identifier,
 	# opening a result, paging through it. Slower than a scripted read, and it
@@ -145,10 +249,150 @@ class MoiFetcher(OperatorAssistedFetcher):
 	}"""
 
 	def fetch_for_vehicle(self, plate_parts):
-		raise FineFetchError(NOT_YET_CAPTURED)
+		raise NotImplementedError(
+			"MOI is queried by traffic profile number, which returns the whole fleet in "
+			"one search. A plate-at-a-time walk would mean one CAPTCHA per vehicle."
+		)
 
-	def fetch_for_traffic_file(self, traffic_file_number, **kwargs):
-		raise FineFetchError(NOT_YET_CAPTURED)
+	def fetch_for_traffic_file(self, traffic_file_number, include_details=False, wait_for_login=True):
+		"""Read the fines the operator has searched for.
+
+		**This never performs the search itself, and that is not an omission.**
+		MOI puts a reCAPTCHA on the search form, not merely on sign-in, so there
+		is no arrangement in which a program submits this query. The person
+		signs in, chooses the company, enters the profile number and answers the
+		challenge; automation starts at the table. `traffic_file_number` is
+		therefore what the operator is asked *for*, and what the result is
+		labelled with - it is never typed into the page by this code.
+
+		Unattended callers get a refusal rather than an empty result. A run that
+		quietly returned nothing here would be recorded as "this fleet has no
+		fines", which is the one outcome that must never be inferred.
+		"""
+		if not wait_for_login:
+			raise AuthenticationRequired(
+				"MOI cannot be fetched unattended: its search form carries a CAPTCHA, so "
+				"a person has to run the query. Nothing was read, and this must not be "
+				"taken to mean the fleet has no fines."
+			)
+
+		page = self.start()
+		page.set_default_navigation_timeout(120000)
+		page.goto(ENTRY_URL, wait_until="domcontentloaded")
+		self._settle(page)
+
+		if not self._await_results(page):
+			raise AuthenticationRequired(
+				"No results table appeared. The operator has to sign in, select the "
+				"company, enter the traffic profile number and answer the CAPTCHA before "
+				"there is anything to read."
+			)
+		self.save_session()
+
+		# Waiting on a person is not reading, and must not spend the budget.
+		self.arm_deadline()
+
+		rows, truncated = self._collect_all_pages(page)
+		fines = [f for f in (self._to_fine(r) for r in rows) if f]
+
+		message = _(
+			"MOI reported {0} fine(s) for traffic profile {1}."
+		).format(len(fines), traffic_file_number)
+		if truncated:
+			message += _(
+				" The read stopped at its time limit before the list ran out, so this is a "
+				"PARTIAL picture - fines beyond this point were never seen, and their "
+				"absence here does not mean they do not exist."
+			)
+		return FetchResult(fines=fines, message=message, truncated=truncated)
+
+	def _await_results(self, page):
+		"""Wait for the operator to produce a results table. Never touches the form."""
+		waited = 0
+		while waited < self.results_timeout_ms:
+			try:
+				if page.evaluate("() => !!document.querySelector('#TicketsTable tbody tr td')"):
+					return True
+			except Exception:
+				pass
+			page.wait_for_timeout(self.poll_interval_ms)
+			waited += self.poll_interval_ms
+		return False
+
+	def _collect_all_pages(self, page):
+		"""Walk the pager, keyed on fine number so a repeated page merges harmlessly."""
+		collected, truncated = {}, False
+		for _ in range(self.max_pages):
+			try:
+				rows = page.evaluate(EXTRACT_ROWS_JS) or []
+			except Exception:
+				break
+			for row in rows:
+				collected[row["ticket"]] = row
+			if self.out_of_time():
+				# Out of budget with pages possibly unread. Reported rather than
+				# treated as the end of the list.
+				truncated = True
+				break
+			before = len(collected)
+			try:
+				if not page.evaluate(NEXT_PAGE_JS):
+					break
+			except Exception:
+				break
+			page.wait_for_timeout(1200)
+			if len(collected) == before and not rows:
+				break
+		return list(collected.values()), truncated
+
+	def _to_fine(self, row):
+		ticket = (row.get("ticket") or "").strip()
+		if not ticket or not ticket.isdigit():
+			return None
+
+		return FetchedFine(
+			ticket_number=ticket,
+			amount=self._amount(row.get("amount")),
+			fine_datetime=self._datetime(row.get("when")),
+			plate=self._plate_label(row.get("plate") or {}),
+			black_points=self._points(row.get("points")),
+			raw={
+				"plate_code": (row.get("plate") or {}).get("code") or None,
+				"plate_number": (row.get("plate") or {}).get("number") or None,
+				"plate_emirate": (row.get("plate") or {}).get("emirate") or None,
+				# MOI labels this column "Fine Type", but its values are Payable
+				# and Unpayable - a status, not a type. Recorded as what it is.
+				"portal_status": (row.get("status") or "").strip() or None,
+				# The issuing authority, deliberately NOT mapped to
+				# fine_location: it is not a location, and enrichment only fills
+				# empty fields, so putting it there would block the real address.
+				"source": (row.get("source") or "").strip() or None,
+			},
+		)
+
+	@staticmethod
+	def _amount(text):
+		match = AMOUNT_RE.search(text or "")
+		return float(match.group(1).replace(",", "")) if match else 0.0
+
+	@staticmethod
+	def _points(text):
+		digits = re.sub(r"[^\d]", "", text or "")
+		return int(digits) if digits else 0
+
+	@staticmethod
+	def _plate_label(plate):
+		"""How the plate reads to a person: category then number."""
+		parts = [plate.get("code"), plate.get("number")]
+		return " ".join(p for p in parts if p) or None
+
+	@staticmethod
+	def _datetime(text):
+		match = DATETIME_RE.search(text or "")
+		if not match:
+			return None
+		day, month, year, hour, minute = (int(g) for g in match.groups())
+		return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:00"
 
 	# -- capture -----------------------------------------------------------
 	def capture_signed_in(self):

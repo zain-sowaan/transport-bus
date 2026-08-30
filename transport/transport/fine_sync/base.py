@@ -69,6 +69,10 @@ class FineFetcher:
 	beyond the life of a run.
 	"""
 
+	# Whether this portal can be queried with nobody present. False where a
+	# person must answer something on every search, not merely at sign-in.
+	supports_unattended = True
+
 	# Whether this fetcher can actually parse a result page yet. False means the
 	# portal's post-login structure has never been captured, so callers must not
 	# offer a fetch - a scraper written against imagined selectors would appear

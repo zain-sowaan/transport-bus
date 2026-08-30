@@ -812,6 +812,14 @@ def run_scheduled_operator_syncs():
 			notes.append(_("{0}: no fetcher is implemented for this portal.").format(portal.name))
 			continue
 
+		if not getattr(fetcher, "supports_unattended", True):
+			notes.append(
+				_("{0}: needs a person for every search, not just for sign-in, so it is "
+				  "never fetched on a schedule. Use Fetch Fines Now with an operator "
+				  "present.").format(portal.name)
+			)
+			continue
+
 		if not getattr(fetcher, "fetch_implemented", True):
 			notes.append(
 				_("{0}: its pages behind the sign-in have not been captured yet, so nothing "
