@@ -16,17 +16,41 @@ policy, not an engineering gap. What it does *not* rule out is a person signing
 in themselves - answering their own challenge in a window we opened is not a
 program solving one - which is the shape TAMM already works in.
 
-**What is still missing, and why there is no parse below.** The post-login pages
-have never been seen. Which identifier MOI accepts (traffic file, plate,
-driving licence), where the results live, how that table is marked up, how it
-paginates, and what its session cookie is called are all unknown. None of it is
-guessable, and guessing has a specific failure mode this design exists to
-prevent: a scraper written against imagined selectors does not crash, it returns
-zero rows, and zero rows reads as "this fleet has no fines".
+**What the 2026-08-30 capture established.** The portal is ASP.NET WebForms
+(`__VIEWSTATE`, `__EVENTTARGET`, `ctl00$...` naming). The fines service accepts
+five alternative identifiers, chosen by one radio group
+(`ctl00$ContentPlaceHolder1$1`):
 
-So `fetch_implemented` is False and both fetch methods refuse. The next step is
-`capture_signed_in()` below, run once with the operator signed in - it records
-what the pages actually are, and the parse gets written from that.
+    rdbTcf          -> txtByTcf            traffic profile number
+    rdbPlate        -> txtPlateNo          + ddlPLateSource/ddlPlateKind/ddlPlateColor
+    rdbLicense      -> txtLicenseNo        + ddlLicenseSource
+    rdbEmirateId    -> txtByEmirateId      + ddlEmirates/ddlYear
+    rdbTicketNumber -> txtByTicketNumber
+
+submitted with `ctl00$ContentPlaceHolder1$btnAdvSearch`. Traffic profile number
+is the one worth using: like TAMM's traffic file it covers a whole fleet in one
+query rather than a plate at a time.
+
+There is also a company selector, `ctl00$UCCompanySelector$ddlCompanies`, which
+scopes the whole session to one company - the same shape as TAMM's "Change
+Traffic Profile", and the same trap: whatever it is left on decides whose fines
+come back. Its options are the operator's own companies and are never recorded
+here.
+
+**Why this still cannot be unattended, now settled twice over.** The login page
+carries reCAPTCHA, confirmed 2026-08-07. The *search form* carries its own
+`g-recaptcha-response` field, confirmed 2026-08-30 - so a banked session does
+not buy an unattended query either. We do not solve, bypass or outsource a
+CAPTCHA. The person signs in, picks the company, enters the identifier and
+answers the challenge; automation resumes at the results table. That moves the
+handoff later than TAMM's but it is the same arrangement.
+
+**What is still missing, and why there is no parse below.** The results table
+has not been seen: a search posts back to the same URL, so the first capture
+recorded five service pages and not one row of data. Until its markup is on
+record, `fetch_implemented` stays False. A scraper written against imagined
+selectors does not crash - it returns zero rows, and zero rows reads as "this
+fleet has no fines".
 """
 
 import json
@@ -37,7 +61,11 @@ import frappe
 from transport.transport.fine_sync.base import FineFetchError
 from transport.transport.fine_sync.operator_fetcher import OperatorAssistedFetcher
 
-ENTRY_URL = "https://portal.moi.gov.ae/eservices/direct?scode=486"
+# Captured 2026-08-30: scode=486 resolves to "Payment of Vehicle Impound
+# Period", not fines. The fines service is its own page, reached from the
+# Traffic Services menu.
+ENTRY_URL = "https://portal.moi.gov.ae/eservices/TrafficServices/Fines/TrafficFinesPayment.aspx"
+PROFILE_URL = "https://portal.moi.gov.ae/eservices/TrafficServices/TrafficProfile/TrafficProfile.aspx"
 
 NOT_YET_CAPTURED = (
 	"MOI's pages behind the sign-in have not been captured yet, so there is nothing to "
@@ -86,10 +114,12 @@ class MoiFetcher(OperatorAssistedFetcher):
 
 	session_filename = "moi.json"
 
-	# Unknown until a capture reports MOI's cookie names. Left None deliberately
-	# so session_status() answers "no datable session" instead of inventing a
-	# reading the portal banner would then present to an operator as fact.
-	session_cookie_name = None
+	# Captured 2026-08-30. MOI issues this with no expiry - a true session
+	# cookie - so session_status() reports "unknown" rather than a countdown:
+	# whether it still works is something only the portal can answer. That is
+	# the honest reading, and it is why the page carries an "Extend session"
+	# button: the timeout is server-side and idle-based.
+	session_cookie_name = ".MOI.SSO.SS"
 
 	# No parse exists. This gates the Fetch Fines button so it never offers
 	# something that cannot happen - delete this line in the same edit that
@@ -100,6 +130,19 @@ class MoiFetcher(OperatorAssistedFetcher):
 	# opening a result, paging through it. Slower than a scripted read, and it
 	# ends when the operator closes the window.
 	capture_window_ms = 1500000
+
+	# MOI is ASP.NET WebForms: a search posts back to the SAME URL, so the
+	# results table renders without the address changing. A capture watching
+	# only the URL recorded five pages of forms and not one row of data - it
+	# saw the operator arrive at each service and never saw them search.
+	# Watching a content signature instead is what makes the results visible.
+	SIGNATURE_JS = """() => {
+	  const rows = document.querySelectorAll('table tr, [role=row]').length;
+	  // Coarse, because the session countdown rewrites text constantly and a
+	  // signature that tracked every character would snapshot on every poll.
+	  const bulk = Math.floor((document.body ? document.body.innerText.length : 0) / 2000);
+	  return document.location.href + '|' + rows + '|' + bulk;
+	}"""
 
 	def fetch_for_vehicle(self, plate_parts):
 		raise FineFetchError(NOT_YET_CAPTURED)
@@ -145,11 +188,16 @@ class MoiFetcher(OperatorAssistedFetcher):
 				# about to drive this window by hand anyway.
 				pass
 
-			waited, last_url = 0, None
+			waited, last_signature = 0, None
 			while waited < self.capture_window_ms:
 				url = page.url or ""
-				if url != last_url and not self._on_auth_page(page):
-					last_url = url
+				try:
+					signature = page.evaluate(self.SIGNATURE_JS)
+				except Exception:
+					# Mid-navigation the context is gone; the next poll catches it.
+					signature = last_signature
+				if signature != last_signature and not self._on_auth_page(page):
+					last_signature = signature
 					self._settle(page)
 					# Counted only once it is actually on disk. Incrementing
 					# first meant a capture that threw while reading a page
