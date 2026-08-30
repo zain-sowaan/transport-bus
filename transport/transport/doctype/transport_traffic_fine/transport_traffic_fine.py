@@ -75,7 +75,13 @@ class TransportTrafficFine(Document):
 		if not self.driver:
 			return
 
-		points = frappe.db.get_single_value("Transport Settings", "black_points_per_fine") or 0
+		# The authority's own count wins when we have it. The Transport Settings
+		# figure is a flat default for hand-entered fines, and applying it to an
+		# imported one would record a 12-point violation as a 2-point one -
+		# understating exactly the fines that matter most for blacklisting.
+		points = self.black_points or frappe.db.get_single_value(
+			"Transport Settings", "black_points_per_fine"
+		) or 0
 		incident = frappe.get_doc(
 			{
 				"doctype": "Driver Incident",

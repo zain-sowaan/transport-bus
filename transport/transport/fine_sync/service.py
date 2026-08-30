@@ -230,10 +230,34 @@ def _sync_one_vehicle(run, fetcher, portal_doc, vehicle):
 
 
 def _stage_fine(run, portal_doc, vehicle, fine):
-	"""Write one fetched fine to staging. Returns True if it was new."""
-	if frappe.db.exists(
-		"Traffic Fine Staging", {"portal": portal_doc.name, "ticket_number": fine.ticket_number}
-	):
+	"""Write one fetched fine to staging. Returns True if it was new.
+
+	A row we already hold is enriched rather than skipped outright. A later run
+	can legitimately know more than an earlier one - the first pass may have read
+	only the portal's list view while a second opened each fine's detail panel -
+	and dropping that would make re-fetching pointless. Only empty fields are
+	filled, and only while the row is still New, so nothing already reviewed or
+	corrected by a person is overwritten.
+	"""
+	existing = frappe.db.get_value(
+		"Traffic Fine Staging",
+		{"portal": portal_doc.name, "ticket_number": fine.ticket_number},
+		["name", "status"],
+		as_dict=True,
+	)
+	if existing:
+		# Stamp every run, on every row, whatever its status. This is what shows
+		# the sync is alive: a fine created four hours ago and last seen a minute
+		# ago is plainly being re-checked. Re-writing the amount to move the
+		# modified timestamp would do the same job by destroying information -
+		# it would overwrite any figure an accountant had corrected, and make
+		# `modified` stop meaning "someone changed this".
+		frappe.db.set_value(
+			"Traffic Fine Staging", existing.name, "last_seen_on", now_datetime(),
+			update_modified=False,
+		)
+		if existing.status == "New":
+			_enrich_staging_row(existing.name, vehicle, fine)
 		return False
 
 	doc = frappe.get_doc({
@@ -248,11 +272,245 @@ def _stage_fine(run, portal_doc, vehicle, fine):
 		"fine_type": fine.fine_type,
 		"fine_location": fine.fine_location,
 		"black_points": fine.black_points,
+		# Optional detail a portal may or may not report. Read from raw so a
+		# fetcher that has these does not need its own staging code, and one
+		# that doesn't simply leaves them empty.
+		"discounted_amount": fine.raw.get("discounted_amount"),
+		"portal_status": fine.raw.get("tamm_status") or fine.raw.get("portal_status"),
+		"description": fine.raw.get("description"),
+		"ticket_type": fine.raw.get("ticket_type"),
 		"raw_payload": json.dumps(fine.raw, indent=1, default=str)[:10000],
 		"status": "New",
+		"last_seen_on": now_datetime(),
 	})
 	doc.insert(ignore_permissions=True)
 	return doc.status == "New"
+
+
+@frappe.whitelist()
+def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, wait_for_login=1):
+	"""Fetch a whole company traffic file with a person completing the sign-in.
+
+	Deliberately NOT routed through `get_syncable_portals()`. That gate exists to
+	stop *unattended* access to a portal nobody authorized, and it turns
+	`is_enabled` into a licence to run without supervision. This path is the
+	opposite: a named operator signs in with their own credentials, watches the
+	window, and answers any challenge themselves. Requiring `is_enabled` here
+	would have meant switching on the very flag that permits scheduled runs, in
+	order to do something a human is standing over.
+
+	Written authorization is still required, because that is about permission to
+	take the data at all - which a person being present does not change.
+
+	Cannot be scheduled: `run_scheduled_syncs` only walks syncable portals, and
+	this one is not among them.
+	"""
+	_check_permission()
+
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	if not portal_doc.has_written_authorization:
+		frappe.throw(
+			_("Record the written authorization for {0} before fetching from it.").format(
+				portal_doc.name
+			),
+			title=_("Authorization Required"),
+		)
+
+	run = frappe.get_doc({
+		"doctype": "Traffic Fine Sync Run",
+		"portal": portal_doc.name,
+		"status": "Running",
+		"started_on": now_datetime(),
+		"triggered_by": frappe.session.user,
+	})
+	run.insert(ignore_permissions=True)
+
+	fetcher, error_log, staged = None, None, 0
+	try:
+		fetcher = get_fetcher(portal_doc)
+		attended = bool(int(wait_for_login))
+		if not attended:
+			# Nobody is watching, so there is nothing for a visible window to
+			# show - and a scheduler worker has no display to open one on.
+			fetcher.headless = True
+		result = fetcher.fetch_for_traffic_file(
+			traffic_file_number,
+			include_details=bool(int(include_details)),
+			wait_for_login=attended,
+		)
+		for fine in result.fines:
+			vehicle = _vehicle_for_plate(fine.raw.get("plate_code"), fine.raw.get("plate_number"))
+			if _stage_fine(run, portal_doc, vehicle, fine):
+				staged += 1
+			run.add_vehicle_result(
+				vehicle.name if vehicle else None,
+				fine.plate,
+				"Success",
+				# A fine we cannot tie to a vehicle is still a real liability.
+				# Saying so per row keeps it from reading as a clean import.
+				None if vehicle else _("No Rental Vehicle matches this plate - fine is unlinked."),
+				1,
+			)
+		run.fines_found = len(result.fines)
+		run.fines_new = staged
+	except Exception:
+		run.status = "Failed"
+		error_log = frappe.get_traceback()
+		frappe.log_error(title=f"Operator-assisted fine sync failed: {portal_doc.name}")
+	finally:
+		if fetcher:
+			fetcher.close()
+		run.finalize(error_log=error_log)
+
+	return {
+		"sync_run": run.name,
+		"status": run.status,
+		"fines_found": run.fines_found,
+		"fines_new": run.fines_new,
+	}
+
+
+@frappe.whitelist()
+def enqueue_operator_assisted_sync(portal, include_details=1):
+	"""The "Fetch Fines Now" button. Queues the run and returns immediately.
+
+	Not run inline: a fetch opens a browser, may wait for a UAE Pass push, and
+	walks every page - minutes of work that would time out a web request long
+	before it finished. The caller gets the Sync Run's name and watches that
+	instead, which is the same record the scheduled path writes.
+	"""
+	_check_permission()
+
+	traffic_file_number = frappe.db.get_value(
+		"Traffic Fine Portal Credential",
+		{"portal": portal, "is_active": 1},
+		"traffic_file_number",
+	)
+	if not traffic_file_number:
+		frappe.throw(
+			_("{0} has no active credential carrying a traffic file number. Add one before "
+			  "fetching - the whole fleet is queried by traffic file, not plate by plate.").format(portal),
+			title=_("Traffic File Number Missing"),
+		)
+
+	frappe.enqueue(
+		"transport.transport.fine_sync.service.run_operator_assisted_sync",
+		queue="long",
+		timeout=3600,
+		portal=portal,
+		traffic_file_number=traffic_file_number,
+		include_details=include_details,
+		wait_for_login=1,
+	)
+	return {
+		"queued": True,
+		"portal": portal,
+		"message": _("Fetch queued. A browser window will open for sign-in; watch "
+		             "Traffic Fine Sync Run for the result."),
+	}
+
+
+def run_scheduled_operator_syncs():
+	"""Pick up new fines automatically, but only while an operator's session lives.
+
+	Deliberately does nothing far more often than it does something, and that is
+	the design rather than a shortcoming:
+
+	* **Off unless switched on.** Same Transport Settings flag as the unattended
+	  syncs, which ships off.
+	* **Never waits for a login.** A sign-in needs a UAE Pass push approved on a
+	  phone. Waiting for one on a schedule would leave a browser hung until the
+	  next fire, and at a 30-minute cadence those stack up until the box dies.
+	  No live session simply means no run.
+	* **Never overlaps itself.** The lock is taken with a 1-second timeout, so a
+	  fire that finds one in progress gives up instead of queueing behind it.
+
+	Its useful window is the ~90 minutes a TAMM session lasts after a person
+	signs in; outside that it costs a file check and returns.
+	"""
+	if not frappe.db.get_single_value("Transport Settings", "enable_scheduled_fine_sync"):
+		return
+
+	from frappe.utils.synchronization import LockTimeoutError, filelock
+
+	portals = frappe.get_all(
+		"Traffic Fine Portal",
+		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
+		fields=["name", "fetcher_key"],
+	)
+
+	for portal in portals:
+		traffic_file_number = frappe.db.get_value(
+			"Traffic Fine Portal Credential",
+			{"portal": portal.name, "is_active": 1},
+			"traffic_file_number",
+		)
+		if not traffic_file_number:
+			# Without a traffic file there is nothing to query; a per-vehicle
+			# fallback would be a different (and much slower) thing entirely.
+			continue
+
+		portal_doc = frappe.get_doc("Traffic Fine Portal", portal.name)
+		try:
+			fetcher = get_fetcher(portal_doc)
+		except Exception:
+			continue
+
+		# Check for a banked session before opening anything at all.
+		has_session = getattr(fetcher, "has_saved_session", None)
+		if not (has_session and has_session()):
+			continue
+
+		try:
+			with filelock(f"fine_sync_{portal.name}", timeout=1):
+				run_operator_assisted_sync(
+					portal.name, traffic_file_number, include_details=1, wait_for_login=0
+				)
+		except LockTimeoutError:
+			# A run is already going. Skipping is correct - two browsers sharing
+			# one portal session is how a session gets invalidated.
+			continue
+		except Exception:
+			frappe.log_error(title=f"Scheduled operator-assisted sync failed: {portal.name}")
+
+
+def _enrich_staging_row(name, vehicle, fine):
+	"""Fill only what the row is still missing, never overwrite."""
+	row = frappe.get_doc("Traffic Fine Staging", name)
+	candidates = {
+		"vehicle": vehicle.name if vehicle else None,
+		"fine_type": fine.fine_type,
+		"fine_location": fine.fine_location,
+		"black_points": fine.black_points or None,
+		"discounted_amount": fine.raw.get("discounted_amount"),
+		"portal_status": fine.raw.get("tamm_status") or fine.raw.get("portal_status"),
+		"description": fine.raw.get("description"),
+		"ticket_type": fine.raw.get("ticket_type"),
+	}
+	updates = {
+		field: value
+		for field, value in candidates.items()
+		if value not in (None, "", 0) and not row.get(field)
+	}
+	if updates:
+		row.db_set(updates, update_modified=False)
+
+
+def _vehicle_for_plate(plate_code, plate_number):
+	"""Match a reported plate to a fleet vehicle, or return None.
+
+	Returns a shape `_stage_fine` and `add_vehicle_result` can both use.
+	"""
+	if not (plate_code and plate_number):
+		return None
+	name = frappe.db.get_value(
+		"Rental Vehicle",
+		{"plate_emirate": "Abu Dhabi", "plate_code": plate_code, "plate_number": plate_number},
+		"name",
+	)
+	if not name:
+		return None
+	return frappe._dict({"name": name, "license_plate": name})
 
 
 @frappe.whitelist()
@@ -291,10 +549,20 @@ def promote_staging_rows(rows):
 			"source_portal": staging.portal,
 			"ticket_number": staging.ticket_number,
 			"vehicle": staging.vehicle,
+			# The plate travels independently of the vehicle link. A portal can
+			# report a fine for a plate that is not in the fleet yet, and losing
+			# it here would leave that fine with nothing identifying the car.
+			"plate_number": staging.plate,
 			"date_time": staging.fine_datetime,
 			"fine_type": staging.fine_type,
 			"fine_location": staging.fine_location,
+			"ticket_type": staging.ticket_type,
+			"description": staging.description,
+			# The authority's own point count, not the flat per-fine default.
+			"black_points": staging.black_points,
+			"portal_status": staging.portal_status,
 			"amount": staging.amount,
+			"discounted_amount": staging.discounted_amount,
 			"add_vat": 0,
 			"responsibility": default_responsibility,
 			"status": "Unpaid",

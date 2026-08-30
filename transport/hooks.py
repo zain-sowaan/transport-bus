@@ -202,6 +202,13 @@ scheduler_events = {
 			"transport.transport.driver_portal.send_trip_reminders",
 			"transport.transport.driver_portal.escalate_unconfirmed_trips",
 		],
+		# Every 45 minutes: picks up new fines during the ~90 minutes a TAMM
+		# session stays alive after an operator signs in. Off unless Transport
+		# Settings enables it, and it exits immediately when no session is
+		# banked - it never waits for a login nobody is there to approve.
+		"*/45 * * * *": [
+			"transport.transport.fine_sync.service.run_scheduled_operator_syncs",
+		],
 	},
 }
 

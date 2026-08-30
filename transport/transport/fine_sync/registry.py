@@ -13,6 +13,7 @@ from frappe import _
 
 from transport.transport.fine_sync.portals.moi import MoiFetcher
 from transport.transport.fine_sync.portals.srta import SrtaFetcher
+from transport.transport.fine_sync.portals.tamm import TammFetcher
 
 # Route-level fetchers: one implementation serving every portal reached the
 # same way. This is what makes a single MOI fetcher cover six portals.
@@ -25,6 +26,10 @@ FETCHERS_BY_ROUTE = {
 # behind a login - so they cannot be keyed on the route.
 FETCHERS_BY_KEY = {
 	"srta": SrtaFetcher,
+	# Operator-assisted: opens a window and waits for a person to sign in. It
+	# is keyed here like any other fetcher so the same run/staging machinery
+	# applies, but it can never be scheduled - see TammFetcher's module docs.
+	"tamm": TammFetcher,
 }
 
 

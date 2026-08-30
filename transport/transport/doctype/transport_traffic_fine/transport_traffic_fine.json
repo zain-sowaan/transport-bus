@@ -10,18 +10,25 @@
   "trip",
   "driver",
   "vehicle",
+  "plate_number",
   "column_break_fine",
   "project",
+  "customer",
+  "rental_agreement",
+  "owning_company",
   "date_time",
   "ticket_number",
   "detail_section",
   "fine_type",
   "fine_location",
+  "ticket_type",
   "column_break_detail",
   "description",
+  "black_points",
   "attachment",
   "amount_section",
   "amount",
+  "discounted_amount",
   "add_vat",
   "vat_amount",
   "column_break_amount",
@@ -30,6 +37,7 @@
   "source_section",
   "source",
   "source_portal",
+  "portal_status",
   "column_break_source",
   "black_points_on_hold",
   "status_section",
@@ -71,6 +79,16 @@
    "options": "Rental Vehicle"
   },
   {
+   "description": "The plate as the authority reported it. Held on the fine itself so an imported fine stays identifiable when its vehicle is not in the fleet yet.",
+   "fetch_from": "vehicle.license_plate",
+   "fetch_if_empty": 1,
+   "fieldname": "plate_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Plate Number"
+  },
+  {
    "fieldname": "column_break_fine",
    "fieldtype": "Column Break"
   },
@@ -81,6 +99,30 @@
    "fieldtype": "Link",
    "label": "Project",
    "options": "Project"
+  },
+  {
+   "description": "Who the vehicle was on hire to. Fetched from the project and overridable, since a fine can belong to a different customer than the project's.",
+   "fetch_from": "project.customer",
+   "fetch_if_empty": 1,
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "description": "The rental contract the vehicle was out on when the fine was issued.",
+   "fieldname": "rental_agreement",
+   "fieldtype": "Link",
+   "label": "Rental Contract",
+   "options": "Rental Agreement"
+  },
+  {
+   "description": "The company that owns the vehicle. A fleet spread across sister companies needs this to book the fine against the right entity.",
+   "fieldname": "owning_company",
+   "fieldtype": "Link",
+   "label": "Owned By",
+   "options": "Company"
   },
   {
    "fieldname": "date_time",
@@ -110,6 +152,12 @@
    "label": "Fine Location"
   },
   {
+   "description": "The authority's own ticket classification, for example Absent.",
+   "fieldname": "ticket_type",
+   "fieldtype": "Data",
+   "label": "Ticket Type"
+  },
+  {
    "fieldname": "column_break_detail",
    "fieldtype": "Column Break"
   },
@@ -117,6 +165,12 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "description": "Black points the issuing authority attached to THIS fine. Overrides the flat per-fine figure in Transport Settings, which cannot know a 12-point violation from a 2-point one.",
+   "fieldname": "black_points",
+   "fieldtype": "Int",
+   "label": "Black Points"
   },
   {
    "fieldname": "attachment",
@@ -134,6 +188,12 @@
    "in_list_view": 1,
    "label": "Fine Amount",
    "reqd": 1
+  },
+  {
+   "description": "Early-payment amount the authority offers, if any. Amount stays the assessed figure because the discount expires and the assessment does not.",
+   "fieldname": "discounted_amount",
+   "fieldtype": "Currency",
+   "label": "Discounted Amount"
   },
   {
    "default": "1",
@@ -165,6 +225,47 @@
    "label": "Responsibility",
    "options": "Driver\nCompany\nCustomer",
    "reqd": 1
+  },
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "default": "Manual",
+   "description": "How this fine reached the system. Fines imported from a portal are held for review before black points are applied.",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Source",
+   "options": "Manual\nPortal Sync",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.source=='Portal Sync'",
+   "description": "Ticket numbers are only unique per authority, so the portal is part of the fine's identity.",
+   "fieldname": "source_portal",
+   "fieldtype": "Link",
+   "label": "Source Portal",
+   "options": "Traffic Fine Portal"
+  },
+  {
+   "description": "Status as the portal reports it. An Unpayable fine cannot be settled online and usually needs a police visit.",
+   "fieldname": "portal_status",
+   "fieldtype": "Select",
+   "label": "Portal Status",
+   "options": "\nPayable\nUnpayable"
+  },
+  {
+   "fieldname": "column_break_source",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "While ticked, this fine will not create a Driver Incident or apply black points. Set automatically on imported fines so that importing paid history cannot blacklist drivers retroactively. Clear it once a human has confirmed the driver is genuinely responsible.",
+   "fieldname": "black_points_on_hold",
+   "fieldtype": "Check",
+   "label": "Black Points On Hold"
   },
   {
    "fieldname": "status_section",
@@ -199,45 +300,11 @@
    "label": "Driver Incident",
    "options": "Driver Incident",
    "read_only": 1
-  },
-  {
-   "fieldname": "source_section",
-   "fieldtype": "Section Break",
-   "label": "Source"
-  },
-  {
-   "default": "Manual",
-   "fieldname": "source",
-   "fieldtype": "Select",
-   "label": "Source",
-   "options": "Manual\nPortal Sync",
-   "in_standard_filter": 1,
-   "reqd": 1,
-   "description": "How this fine reached the system. Fines imported from a portal are held for review before black points are applied."
-  },
-  {
-   "fieldname": "source_portal",
-   "fieldtype": "Link",
-   "label": "Source Portal",
-   "options": "Traffic Fine Portal",
-   "depends_on": "eval:doc.source=='Portal Sync'",
-   "description": "Ticket numbers are only unique per authority, so the portal is part of the fine's identity."
-  },
-  {
-   "fieldname": "column_break_source",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "fieldname": "black_points_on_hold",
-   "fieldtype": "Check",
-   "label": "Black Points On Hold",
-   "description": "While ticked, this fine will not create a Driver Incident or apply black points. Set automatically on imported fines so that importing paid history cannot blacklist drivers retroactively. Clear it once a human has confirmed the driver is genuinely responsible."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-07 11:00:00.000000",
+ "modified": "2026-08-29 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Traffic Fine",
