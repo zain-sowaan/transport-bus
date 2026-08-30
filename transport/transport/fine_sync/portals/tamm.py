@@ -173,6 +173,11 @@ class TammFetcher(BrowserFetcher):
 	# Long enough that a person is never interrupted mid-flow, short enough that
 	# a completed login is picked up without them having to do anything else.
 	renavigate_after_ms = 30000
+	# The fines table is rendered by a SPA some seconds after the navigation
+	# resolves, so an unattended run that checks once the moment the page loads
+	# reports "no session" for a session that is perfectly alive. Bounded, so a
+	# genuinely dead session still fails fast rather than hanging a worker.
+	unattended_grace_ms = 90000
 	# Comfortably more pages than a fleet's fine list should ever run to; the
 	# walk stops on "nothing new" long before this, and this only bounds a
 	# pager that would otherwise cycle.
@@ -321,7 +326,7 @@ class TammFetcher(BrowserFetcher):
 
 		if wait_for_login:
 			self._await_operator_login(page, traffic_file_number)
-		elif not self._table_present(page):
+		elif not self._await_table(page):
 			raise AuthenticationRequired(
 				"No live TAMM session. A person has to sign in through UAE Pass before "
 				"an unattended run can read anything."
@@ -382,6 +387,21 @@ class TammFetcher(BrowserFetcher):
 			"Timed out waiting for the operator to complete UAE Pass sign-in and reach the "
 			f"fines page for traffic file {traffic_file_number}. Nothing was fetched."
 		)
+
+	def _await_table(self, page):
+		"""Give the table a bounded moment to render before calling it a dead session.
+
+		Unattended runs get no second chance: the caller turns a False here into
+		a Failed run and an error log. Checking once, immediately after the
+		navigation resolves, is what made an alive session look dead.
+		"""
+		waited = 0
+		while waited < self.unattended_grace_ms:
+			if self._table_present(page):
+				return True
+			page.wait_for_timeout(self.poll_interval_ms)
+			waited += self.poll_interval_ms
+		return False
 
 	def _on_auth_page(self, page):
 		"""True while the browser is on a sign-in host we must not interrupt."""
