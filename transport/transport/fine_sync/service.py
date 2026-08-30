@@ -15,6 +15,7 @@ Two rules shape everything here:
 """
 
 import json
+import time
 
 import frappe
 from frappe import _
@@ -26,6 +27,29 @@ from transport.transport.fine_sync.registry import get_fetcher, is_supported
 from transport.transport.vehicle_plate import PLATE_FIELDS
 
 SYNC_ROLES = ("Transport Accounts", "Transport Operations", "System Manager")
+
+# Used when Transport Settings has no figure of its own. A Single's JSON default
+# never reaches tabSingles until the doc is saved once, so reading the setting
+# alone would give None on every site that has not opened the form.
+DEFAULT_SWEEP_BUDGET_MINUTES = 30
+
+
+def _sweep_budget_seconds():
+	"""How long a sync may spend fetching. None means no limit.
+
+	0 means "not configured", not "unlimited". `get_single_value` casts an Int
+	field to 0 when the Single has never been saved, so an unset site and a site
+	deliberately holding 0 are indistinguishable - and reading that as no limit
+	would leave every site that has not opened Transport Settings running the
+	unbounded sweep this exists to stop. Removing the ceiling is therefore an
+	explicit act: a negative value.
+	"""
+	minutes = int(frappe.db.get_single_value(
+		"Transport Settings", "fine_sync_time_budget_minutes"
+	) or 0)
+	if minutes == 0:
+		minutes = DEFAULT_SWEEP_BUDGET_MINUTES
+	return minutes * 60 if minutes > 0 else None
 
 
 def _checkpoint():
@@ -205,9 +229,27 @@ def run_sync(portal, limit=None, vehicles=None):
 
 	fetcher = None
 	error_log = None
+	budget = _sweep_budget_seconds()
+	deadline = time.monotonic() + budget if budget else None
 	try:
 		fetcher = get_fetcher(portal_doc, credential_doc)
-		for v in queryable:
+		fetcher.time_budget_seconds = budget
+		fetcher.arm_deadline()
+		for index, v in enumerate(queryable):
+			# Checked between vehicles, which is where a sweep actually spends
+			# its time: one browser page load each, so 42 vehicles can run past
+			# half an hour. Stopping here leaves the fleet partly covered, and
+			# the rest of this block exists to make sure that is never mistaken
+			# for a clean result.
+			if deadline and time.monotonic() >= deadline:
+				for skipped in queryable[index:]:
+					run.add_vehicle_result(
+						skipped.name, skipped.license_plate, "Skipped",
+						_("The sync reached its {0}-minute time limit before this vehicle. "
+						  "Its fines are unknown, not zero.").format(budget // 60),
+					)
+				run.status = "Completed with Errors"
+				break
 			_sync_one_vehicle(run, fetcher, portal_doc, v)
 			# Per vehicle, not per run: a fleet sweep is a browser page load each,
 			# so holding every staged fine back to the end means holding the
@@ -366,6 +408,10 @@ def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, w
 	fetcher, error_log, staged = None, None, 0
 	try:
 		fetcher = get_fetcher(portal_doc)
+		# The fetcher arms this itself once the sign-in is done, so an operator
+		# taking ten minutes to approve a UAE Pass push does not spend the time
+		# meant for reading fines.
+		fetcher.time_budget_seconds = _sweep_budget_seconds()
 		attended = bool(int(wait_for_login))
 		if not attended:
 			# Nobody is watching, so there is nothing for a visible window to
@@ -392,6 +438,14 @@ def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, w
 			_checkpoint()
 		run.fines_found = len(result.fines)
 		run.fines_new = staged
+		if result.truncated:
+			# A time-limited read covered part of the portal's list. Saying
+			# "Completed" here would present that as the whole liability.
+			run.status = "Completed with Errors"
+			# The status alone says something went wrong without saying what.
+			# The fetcher's message is the only place that records the list was
+			# cut short rather than exhausted, so it has to land on the run.
+			error_log = result.message
 	except Exception:
 		run.status = "Failed"
 		error_log = frappe.get_traceback()

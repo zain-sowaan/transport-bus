@@ -39,6 +39,7 @@
   "black_points_per_fine",
   "fine_sync_section",
   "enable_scheduled_fine_sync",
+  "fine_sync_time_budget_minutes",
   "column_break_fine_sync",
   "imported_fine_responsibility"
  ],
@@ -288,6 +289,13 @@
    "fieldtype": "Check",
    "label": "Enable Scheduled Fine Sync",
    "description": "Off by default. Even when on, a sync only runs against portals that are enabled and hold a valid written authorization."
+  },
+  {
+   "fieldname": "fine_sync_time_budget_minutes",
+   "fieldtype": "Int",
+   "label": "Fine Sync Time Limit (Minutes)",
+   "default": "30",
+   "description": "How long one sync may spend fetching before it stops and reports what it covered. A fleet sweep is a browser page load per vehicle, so without a limit it can run for tens of minutes. Vehicles not reached are recorded as Skipped and the run is marked Completed with Errors - never Completed. Leave at 0 to use the 30-minute default; set -1 to remove the limit."
   },
   {
    "fieldname": "column_break_fine_sync",

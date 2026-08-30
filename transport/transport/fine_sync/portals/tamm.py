@@ -332,16 +332,27 @@ class TammFetcher(BrowserFetcher):
 				"an unattended run can read anything."
 			)
 
-		rows = self._collect_all_pages(page, include_details=include_details)
+		# Neither the sign-in wait nor the render wait counts against the fetch
+		# budget - they are waiting, not reading, and an operator taking ten
+		# minutes to approve a push should not cost the fleet ten minutes of
+		# results.
+		self.arm_deadline()
+
+		rows, truncated = self._collect_all_pages(page, include_details=include_details)
 		fines = [f for f in (self._to_fine(row) for row in rows) if f]
 
-		return FetchResult(
-			fines=fines,
-			message=(
-				f"TAMM reported {len(fines)} fine(s) for traffic file {traffic_file_number}, "
-				"covering Abu Dhabi Police, Dubai and Integrated Transport Center."
-			),
+		message = (
+			f"TAMM reported {len(fines)} fine(s) for traffic file {traffic_file_number}, "
+			"covering Abu Dhabi Police, Dubai and Integrated Transport Center."
 		)
+		if truncated:
+			message += (
+				" The read stopped at its time limit before the list ran out, so this is a "
+				"PARTIAL picture - fines beyond this point were never seen, and their absence "
+				"here does not mean they do not exist."
+			)
+
+		return FetchResult(fines=fines, message=message, truncated=truncated)
 
 	# -- login -------------------------------------------------------------
 	def _await_operator_login(self, page, traffic_file_number):
@@ -428,14 +439,21 @@ class TammFetcher(BrowserFetcher):
 		pager, a next-arrow, or something that silently does nothing.
 		"""
 		collected = {}
+		truncated = False
 		rows = page.evaluate(EXTRACT_ROWS_JS)
 		if not rows:
 			raise AuthenticationRequired("Signed in, but the fines table never appeared.")
 		self._absorb(collected, rows)
 		if include_details:
-			self._details_for_visible(page, rows)
+			truncated = self._details_for_visible(page, rows)
 
 		for _ in range(self.max_pages):
+			if truncated or self.out_of_time():
+				# Out of budget with pages still unread. Reported rather than
+				# treated as the end of the list: what has been collected is
+				# real, but it is not everything.
+				truncated = True
+				break
 			before = len(collected)
 			try:
 				if not page.evaluate(NEXT_PAGE_JS):
@@ -449,11 +467,11 @@ class TammFetcher(BrowserFetcher):
 				break
 			self._absorb(collected, rows)
 			if include_details and rows:
-				self._details_for_visible(page, rows)
+				truncated = self._details_for_visible(page, rows)
 			if len(collected) == before:
 				break
 
-		return list(collected.values())
+		return list(collected.values()), truncated
 
 	def _details_for_visible(self, page, rows):
 		"""Open each rendered row's detail modal and attach what it says.
@@ -461,8 +479,15 @@ class TammFetcher(BrowserFetcher):
 		Best effort per row: a fine whose modal will not open keeps its
 		list-view values instead of failing the run. The list simply does not
 		carry the violation description, so without this they stay empty.
+
+		Returns True if the time limit stopped it partway. The budget is checked
+		per row rather than per page because this is where the time goes - ten
+		rows of open-read-dismiss is minutes, so checking only between pages
+		could overshoot the limit by more than it allows.
 		"""
 		for row in rows:
+			if self.out_of_time():
+				return True
 			ticket = (row.get("fineNumber") or "").strip()
 			if not ticket.isdigit():
 				continue
@@ -470,6 +495,7 @@ class TammFetcher(BrowserFetcher):
 				row["_details"] = self._read_detail_panel(page, ticket) or {}
 			except Exception:
 				row["_details"] = {}
+		return False
 
 	@staticmethod
 	def _absorb(collected, rows):

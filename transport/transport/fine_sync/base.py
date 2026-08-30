@@ -11,6 +11,7 @@ backend request has been captured yet - today every portal needs a browser,
 but any of them may become a direct HTTP call once its contract is known.
 """
 
+import time
 from dataclasses import dataclass, field
 
 
@@ -53,6 +54,11 @@ class FetchedFine:
 class FetchResult:
 	fines: list[FetchedFine] = field(default_factory=list)
 	message: str | None = None
+	# True when a time limit stopped the read before the portal ran out of
+	# results. Carried as a flag rather than left to the message, because a
+	# caller has to downgrade the run's status on it - a partial read that
+	# reports "Completed" is the same lie as a failed lookup reporting zero.
+	truncated: bool = False
 
 
 class FineFetcher:
@@ -63,9 +69,25 @@ class FineFetcher:
 	beyond the life of a run.
 	"""
 
+	# Wall-clock budget for the fetching itself, in seconds; None is unbounded.
+	# The caller sets it, but the fetcher decides when to start the clock, so
+	# that waiting for a person to sign in never spends time meant for reading
+	# fines.
+	time_budget_seconds = None
+
 	def __init__(self, portal, credential=None):
 		self.portal = portal
 		self.credential = credential
+		self._deadline = None
+
+	def arm_deadline(self):
+		"""Start the clock. Call when real work begins, not when the run does."""
+		self._deadline = (
+			time.monotonic() + self.time_budget_seconds if self.time_budget_seconds else None
+		)
+
+	def out_of_time(self):
+		return self._deadline is not None and time.monotonic() >= self._deadline
 
 	def fetch_for_vehicle(self, plate_parts) -> FetchResult:
 		"""Return the fines for one vehicle.

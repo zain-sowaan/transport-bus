@@ -45,8 +45,12 @@ class TrafficFineSyncRun(Document):
 		if error_log:
 			self.error_log = error_log[:10000]
 
-		if self.status == "Failed":
-			pass  # a hard failure was already recorded by the caller
+		if self.status in ("Failed", "Completed with Errors"):
+			# The caller already recorded a hard failure, or a sweep that ran out
+			# of time before covering the fleet. Neither may be upgraded here:
+			# the whole point of this doctype is that a partial picture cannot
+			# present itself as a full one.
+			pass
 		elif self.vehicles_failed:
 			self.status = "Completed with Errors"
 		else:
