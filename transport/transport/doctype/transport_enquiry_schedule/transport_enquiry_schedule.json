@@ -39,8 +39,7 @@
    "default": "0",
    "label": "Pick-up TBA",
    "description": "The customer has not advised this time yet. Tick this instead of inventing one - it clears the time above.",
-   "in_list_view": 1,
-   "columns": 1
+   "in_list_view": 0
   },
   {
    "fieldname": "dropoff_time",

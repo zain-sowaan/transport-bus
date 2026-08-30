@@ -19,7 +19,7 @@
  ],
  "fields": [
   {
-   "columns": 1,
+   "columns": 2,
    "fieldname": "shift",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -28,7 +28,7 @@
    "reqd": 1
   },
   {
-   "columns": 1,
+   "columns": 2,
    "description": "Excluding means the weekend charge is billed to the customer on top of the monthly value; Including means it is absorbed in that value.",
    "fieldname": "weekend_payment",
    "fieldtype": "Select",
@@ -37,7 +37,7 @@
    "options": "\nIncluding\nExcluding"
   },
   {
-   "columns": 1,
+   "columns": 2,
    "fieldname": "public_holiday_payment",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -45,7 +45,7 @@
    "options": "\nIncluding\nExcluding"
   },
   {
-   "columns": 1,
+   "columns": 2,
    "description": "Whether road tolls are absorbed in the monthly value or recharged to the customer.",
    "fieldname": "salik_darb",
    "fieldtype": "Select",

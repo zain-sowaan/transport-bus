@@ -29,14 +29,16 @@
    "label": "Trip",
    "options": "Trip",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "columns": 1
   },
   {
    "fieldname": "trip_date",
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "Date",
-   "read_only": 1
+   "read_only": 1,
+   "columns": 1
   },
   {
    "fieldname": "route",
@@ -44,7 +46,8 @@
    "in_list_view": 1,
    "label": "Route",
    "options": "Route",
-   "read_only": 1
+   "read_only": 1,
+   "columns": 1
   },
   {
    "fieldname": "direction",
@@ -52,7 +55,8 @@
    "in_list_view": 1,
    "label": "Direction",
    "options": "Pickup\nDrop",
-   "read_only": 1
+   "read_only": 1,
+   "columns": 1
   },
   {
    "fieldname": "column_break_1",
@@ -63,14 +67,16 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Driver",
-   "options": "Driver"
+   "options": "Driver",
+   "columns": 1
   },
   {
    "fieldname": "vehicle",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Vehicle",
-   "options": "Rental Vehicle"
+   "options": "Rental Vehicle",
+   "columns": 1
   },
   {
    "fieldname": "scheduled_time",
@@ -100,7 +106,8 @@
    "in_list_view": 1,
    "label": "Duty Type",
    "options": "Duty\nOT",
-   "read_only": 1
+   "read_only": 1,
+   "columns": 1
   },
   {
    "default": "0",
@@ -108,7 +115,8 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Additional",
-   "read_only": 1
+   "read_only": 1,
+   "columns": 1
   },
   {
    "default": "0",
@@ -116,7 +124,8 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "PH",
-   "read_only": 1
+   "read_only": 1,
+   "columns": 1
   },
   {
    "columns": 1,

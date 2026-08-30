@@ -21,7 +21,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Staff Name",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 2
   },
   {
    "default": "Good",
@@ -30,7 +31,8 @@
    "in_list_view": 1,
    "label": "Respect to Staff",
    "options": "Good\nPoor",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 2
   },
   {
    "default": "Good",
@@ -39,7 +41,8 @@
    "in_list_view": 1,
    "label": "Pickup/Drop Ontime",
    "options": "Good\nPoor",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 2
   },
   {
    "default": "Good",
@@ -48,7 +51,8 @@
    "in_list_view": 1,
    "label": "Communication",
    "options": "Good\nPoor",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 2
   },
   {
    "fieldname": "column_break_1",
@@ -61,7 +65,8 @@
    "in_list_view": 1,
    "label": "Attitude",
    "options": "Good\nPoor",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 1
   },
   {
    "default": "Good",
@@ -70,7 +75,8 @@
    "in_list_view": 1,
    "label": "Behaviour",
    "options": "Good\nPoor",
-   "reqd": 1
+   "reqd": 1,
+   "columns": 1
   },
   {
    "fieldname": "suggestion_remarks",
