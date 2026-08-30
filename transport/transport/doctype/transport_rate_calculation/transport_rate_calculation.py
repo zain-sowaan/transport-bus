@@ -60,12 +60,12 @@ class TransportRateCalculation(Document):
 
 		for row in self.vehicles:
 			# A vehicle supplied without fuel or without a driver cannot carry
-			# those costs, whatever was typed before the option was changed.
-			if row.with_fuel != "With Fuel":
-				row.fuel_cost = 0
-			if row.with_driver != "With Driver":
-				row.driver_salary_cost = 0
-				row.room_rent_cost = 0
+			# those costs. Say so rather than zeroing them: With Fuel / With
+			# Driver default to one answer each, so a row can end up denying a
+			# cost the estimator typed without anyone having chosen that, and a
+			# figure silently dropped out of a cost build-up is the one kind of
+			# error this document exists to prevent.
+			self.check_supply_terms(row)
 
 			# The client's sheet quotes running per day and costs per month, so
 			# the monthly figures are derived rather than typed twice. Working
@@ -119,6 +119,27 @@ class TransportRateCalculation(Document):
 			self.total_margin / self.total_estimated_cost * 100 if self.total_estimated_cost else 0
 		)
 		self.requires_discount_approval = 1 if any(flt(r.discount_percent) > 0 for r in self.vehicles) else 0
+
+	@staticmethod
+	def check_supply_terms(row):
+		"""A row may not claim a cost the supply terms say it does not carry."""
+		for term, value, costs in (
+			("with_fuel", "With Fuel", ("fuel_cost",)),
+			("with_driver", "With Driver", ("driver_salary_cost", "room_rent_cost")),
+		):
+			if row.get(term) == value:
+				continue
+			charged = [c for c in costs if flt(row.get(c))]
+			if not charged:
+				continue
+			labels = ", ".join(_(frappe.unscrub(c)) for c in charged)
+			frappe.throw(
+				_(
+					"Row {0}: this vehicle is {1}, so it cannot carry {2}. Clear the amount, "
+					"or change the supply term if the cost is real."
+				).format(row.idx, row.get(term) or _("not marked as {0}").format(_(value)), labels),
+				title=_("Cost Contradicts Supply Terms"),
+			)
 
 	def enforce_minimum_margin(self):
 		if not frappe.db.get_single_value("Transport Settings", "enforce_minimum_margin"):
