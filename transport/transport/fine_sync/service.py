@@ -15,7 +15,9 @@ Two rules shape everything here:
 """
 
 import json
+import os
 import time
+from datetime import datetime, timezone
 
 import frappe
 from frappe import _
@@ -592,6 +594,71 @@ def describe_session_status(status):
 	return status
 
 
+def _apply_portal_verdict(status, fetcher, portal_doc):
+	"""Let the portal overrule the cookie about whether a session still works.
+
+	A cookie's expiry is a ceiling, not a promise. The portal can end a session
+	early - an idle timeout, a sign-out elsewhere, a profile that reset - and
+	nothing on disk changes when it does. So the banner cheerfully read
+	"live for about another 25m" while every scheduled fetch behind it was
+	failing with "No live session", which is the same reading being right about
+	the file and wrong about the world.
+
+	The last unattended attempt is the only evidence that reflects the portal's
+	own opinion, so when one has failed on authentication *since* the session
+	was banked, that verdict wins.
+	"""
+	if status.get("state") not in ("live", "unknown"):
+		return
+
+	try:
+		path = fetcher.session_path()
+		banked_at = frappe.utils.convert_utc_to_system_timezone(
+			datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
+		).replace(tzinfo=None)
+	except Exception:
+		return
+
+	run = frappe.get_all(
+		"Traffic Fine Sync Run",
+		filters={"portal": portal_doc.name, "status": "Failed"},
+		fields=["name", "started_on", "error_log"],
+		order_by="started_on desc",
+		limit=1,
+	)
+	if not run:
+		return
+	run = run[0]
+	if not run.started_on or run.started_on < banked_at:
+		# Older than the sign-in it would be judging. Says nothing about now.
+		return
+	if "AuthenticationRequired" not in (run.error_log or ""):
+		return
+
+	status["usable"] = False
+	status["state"] = "rejected"
+	status["indicator"] = "red"
+	status["message"] = _(
+		"The portal refused this session at {0}, even though the saved cookie has not "
+		"expired yet - so a sign-in is needed despite what the clock says. Sync run {1} "
+		"has the detail."
+	).format(frappe.utils.format_datetime(run.started_on, "HH:mm"), run.name)
+
+
+def portal_session_reading(fetcher, portal_doc):
+	"""The one reading of a portal's sign-in, for the form and the sweep both.
+
+	They used to answer this separately, and a sweep that trusted the cookie
+	queued a fetch every 45 minutes that the portal had already refused.
+	"""
+	reader = getattr(fetcher, "session_status", None)
+	status = describe_session_status(
+		reader() if reader else {"state": "unsupported", "usable": False}
+	)
+	_apply_portal_verdict(status, fetcher, portal_doc)
+	return status
+
+
 @frappe.whitelist()
 def get_portal_session_status(portal):
 	"""How much life is left in an operator's banked sign-in, for the desk.
@@ -631,10 +698,7 @@ def get_portal_session_status(portal):
 			).format(portal_doc.name),
 		}
 
-	reader = getattr(fetcher, "session_status", None)
-	status = describe_session_status(
-		reader() if reader else {"state": "unsupported", "usable": False}
-	)
+	status = portal_session_reading(fetcher, portal_doc)
 	status["fetch_implemented"] = bool(getattr(fetcher, "fetch_implemented", True))
 	status["can_capture"] = hasattr(fetcher, "capture_signed_in")
 	# Every button on the form is gated on one of these. They are answered here,
@@ -839,9 +903,7 @@ def run_scheduled_operator_syncs():
 			continue
 
 		# Check for a banked session before opening anything at all.
-		status = describe_session_status(
-			fetcher.session_status() if hasattr(fetcher, "session_status") else {}
-		)
+		status = portal_session_reading(fetcher, portal_doc)
 		if not status.get("usable"):
 			notes.append(
 				_("{0}: not fetched - {1}").format(
