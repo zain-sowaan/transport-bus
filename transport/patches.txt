@@ -15,3 +15,4 @@ transport.patches.move_rate_calculation_to_vehicle_rows
 transport.patches.seed_expense_claim_types
 transport.patches.update_srta_verified_reference
 transport.patches.clear_fabricated_trip_actual_times
+transport.patches.rename_staging_last_seen_on

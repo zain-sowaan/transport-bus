@@ -15,7 +15,7 @@
   "vehicle",
   "plate",
   "fine_datetime",
-  "last_seen_on",
+  "last_fetched_on",
   "col2",
   "amount",
   "discounted_amount",
@@ -158,10 +158,10 @@
   },
   {
    "description": "When a sync last saw this fine still listed on the portal. Updated on every run, whether or not anything changed - this is what proves the sync is alive without touching data a person may have corrected.",
-   "fieldname": "last_seen_on",
+   "fieldname": "last_fetched_on",
    "fieldtype": "Datetime",
    "in_list_view": 1,
-   "label": "Last Seen on Portal",
+   "label": "Last Fetched On",
    "read_only": 1
   }
  ],

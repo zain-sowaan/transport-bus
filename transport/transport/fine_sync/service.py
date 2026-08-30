@@ -280,15 +280,16 @@ def _stage_fine(run, portal_doc, vehicle, fine):
 		as_dict=True,
 	)
 	if existing:
-		# Stamp every run, on every row, whatever its status. This is what shows
-		# the sync is alive: a fine created four hours ago and last seen a minute
-		# ago is plainly being re-checked. Re-writing the amount to move the
-		# modified timestamp would do the same job by destroying information -
-		# it would overwrite any figure an accountant had corrected, and make
-		# `modified` stop meaning "someone changed this".
+		# Stamp every run, on every row, whatever its status, and let it move
+		# `modified` with it. Two reasons the timestamp must not be suppressed:
+		# the list view's own "Last Updated On" is what an operator actually
+		# reads, and a row still showing "1 d" after a fetch a minute ago reads
+		# as a sync that never ran. Recording that we looked IS a write, so
+		# `modified` moving is accurate rather than cosmetic - and unlike
+		# re-writing the amount to force the same effect, it destroys nothing an
+		# accountant may have corrected.
 		frappe.db.set_value(
-			"Traffic Fine Staging", existing.name, "last_seen_on", now_datetime(),
-			update_modified=False,
+			"Traffic Fine Staging", existing.name, "last_fetched_on", now_datetime()
 		)
 		if existing.status == "New":
 			_enrich_staging_row(existing.name, vehicle, fine)
@@ -315,7 +316,7 @@ def _stage_fine(run, portal_doc, vehicle, fine):
 		"ticket_type": fine.raw.get("ticket_type"),
 		"raw_payload": json.dumps(fine.raw, indent=1, default=str)[:10000],
 		"status": "New",
-		"last_seen_on": now_datetime(),
+		"last_fetched_on": now_datetime(),
 	})
 	doc.insert(ignore_permissions=True)
 	return doc.status == "New"
