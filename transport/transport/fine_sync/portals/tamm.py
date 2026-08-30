@@ -203,6 +203,9 @@ class TammFetcher(BrowserFetcher):
 
 		directory = frappe.get_site_path("private", "portal-sessions")
 		os.makedirs(directory, exist_ok=True)
+		# makedirs' mode argument is filtered through the process umask, which on a
+		# normal bench leaves this group- and world-readable. Set it outright.
+		os.chmod(directory, 0o700)
 		return os.path.join(directory, "tamm.json")
 
 	def start(self):
@@ -236,8 +239,15 @@ class TammFetcher(BrowserFetcher):
 		"""
 		if not self._context:
 			return
+
+		import os
+
 		try:
-			self._context.storage_state(path=self.session_path())
+			path = self.session_path()
+			self._context.storage_state(path=path)
+			# This file is a live government-portal session. Owner-only, always -
+			# Playwright writes it with the default umask otherwise.
+			os.chmod(path, 0o600)
 		except Exception:
 			# Losing the session cache is a nuisance, never a reason to fail a
 			# run that has already fetched real data.
@@ -303,7 +313,7 @@ class TammFetcher(BrowserFetcher):
 		`wait_for_login=False` is the unattended mode: it uses whatever session
 		was saved and gives up at once if that session is dead. A scheduled run
 		must never sit waiting for a push nobody is going to approve - at a
-		30-minute cadence that would leave hung browsers stacking up.
+		45-minute cadence that would leave hung browsers stacking up.
 		"""
 		page = self.start()
 		page.goto(FINES_URL.format(tcf=traffic_file_number), wait_until="domcontentloaded")
