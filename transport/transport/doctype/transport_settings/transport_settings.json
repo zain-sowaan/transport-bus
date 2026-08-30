@@ -41,7 +41,10 @@
   "enable_scheduled_fine_sync",
   "fine_sync_time_budget_minutes",
   "column_break_fine_sync",
-  "imported_fine_responsibility"
+  "imported_fine_responsibility",
+  "sweep_status_section",
+  "last_operator_sweep_on",
+  "last_operator_sweep_note"
  ],
  "fields": [
   {
@@ -285,17 +288,17 @@
   },
   {
    "default": "0",
+   "description": "Off by default. Even when on, a sync only runs against portals that are enabled and hold a valid written authorization.",
    "fieldname": "enable_scheduled_fine_sync",
    "fieldtype": "Check",
-   "label": "Enable Scheduled Fine Sync",
-   "description": "Off by default. Even when on, a sync only runs against portals that are enabled and hold a valid written authorization."
+   "label": "Enable Scheduled Fine Sync"
   },
   {
+   "default": "30",
+   "description": "How long one sync may spend fetching before it stops and reports what it covered. A fleet sweep is a browser page load per vehicle, so without a limit it can run for tens of minutes. Vehicles not reached are recorded as Skipped and the run is marked Completed with Errors - never Completed. Leave at 0 to use the 30-minute default; set -1 to remove the limit.",
    "fieldname": "fine_sync_time_budget_minutes",
    "fieldtype": "Int",
-   "label": "Fine Sync Time Limit (Minutes)",
-   "default": "30",
-   "description": "How long one sync may spend fetching before it stops and reports what it covered. A fleet sweep is a browser page load per vehicle, so without a limit it can run for tens of minutes. Vehicles not reached are recorded as Skipped and the run is marked Completed with Errors - never Completed. Leave at 0 to use the 30-minute default; set -1 to remove the limit."
+   "label": "Fine Sync Time Limit (Minutes)"
   },
   {
    "fieldname": "column_break_fine_sync",
@@ -303,18 +306,37 @@
   },
   {
    "default": "Company",
+   "description": "Applied to fines imported from a portal. Company is the safe default: assigning a Driver automatically would feed the black-points and blacklisting chain from data nobody has reviewed.",
    "fieldname": "imported_fine_responsibility",
    "fieldtype": "Select",
    "label": "Default Responsibility for Imported Fines",
-   "options": "Company\nDriver\nCustomer",
-   "description": "Applied to fines imported from a portal. Company is the safe default: assigning a Driver automatically would feed the black-points and blacklisting chain from data nobody has reviewed."
+   "options": "Company\nDriver\nCustomer"
+  },
+  {
+   "fieldname": "sweep_status_section",
+   "fieldtype": "Section Break",
+   "label": "Last Automatic Fetch"
+  },
+  {
+   "description": "When the scheduled fetch last looked at the operator-assisted portals.",
+   "fieldname": "last_operator_sweep_on",
+   "fieldtype": "Datetime",
+   "label": "Last Checked On",
+   "read_only": 1
+  },
+  {
+   "description": "Why the last scheduled fetch did or did not run. The job log says only \"Complete\" either way, so this is where the reason is kept.",
+   "fieldname": "last_operator_sweep_note",
+   "fieldtype": "Small Text",
+   "label": "What Happened",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-07 12:00:00.000000",
+ "modified": "2026-08-30 15:05:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Settings",

@@ -35,7 +35,9 @@
   "last_verified",
   "column_break_review",
   "scope_note",
-  "notes"
+  "notes",
+  "capture_section",
+  "last_capture_summary"
  ],
  "fields": [
   {
@@ -93,8 +95,8 @@
    "fieldname": "public_form_url",
    "fieldtype": "Data",
    "label": "Public Form URL",
-   "options": "URL",
-   "length": 500
+   "length": 500,
+   "options": "URL"
   },
   {
    "fieldname": "gate_section",
@@ -168,8 +170,8 @@
    "fieldname": "tos_url",
    "fieldtype": "Data",
    "label": "Terms of Service URL",
-   "options": "URL",
-   "length": 500
+   "length": 500,
+   "options": "URL"
   },
   {
    "fieldname": "tos_note",
@@ -206,27 +208,40 @@
    "label": "Notes / Issues"
   },
   {
+   "default": "Not Supported",
+   "description": "Automated: can be queried unattended. Operator Assisted: needs a person to sign in or clear a challenge, so a fetch can only prepare the work. Set from what a capture actually found, not from what is hoped.",
    "fieldname": "fetch_mode",
    "fieldtype": "Select",
-   "label": "Fetch Mode",
-   "reqd": 1,
-   "default": "Not Supported",
    "in_list_view": 1,
    "in_standard_filter": 1,
+   "label": "Fetch Mode",
    "options": "Not Supported\nAutomated\nOperator Assisted",
-   "description": "Automated: can be queried unattended. Operator Assisted: needs a person to sign in or clear a challenge, so a fetch can only prepare the work. Set from what a capture actually found, not from what is hoped."
+   "reqd": 1
   },
   {
+   "description": "Selects the portal-specific fetcher. Falls back to the access route when blank, which is how one MOI fetcher serves six portals.",
    "fieldname": "fetcher_key",
    "fieldtype": "Data",
-   "label": "Fetcher Key",
-   "description": "Selects the portal-specific fetcher. Falls back to the access route when blank, which is how one MOI fetcher serves six portals."
+   "label": "Fetcher Key"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "capture_section",
+   "fieldtype": "Section Break",
+   "label": "Page Capture"
+  },
+  {
+   "description": "What the last Capture Portal Pages run recorded, and where. Written before any fetch exists for a portal, so the real page structure can be read off rather than guessed at.",
+   "fieldname": "last_capture_summary",
+   "fieldtype": "Small Text",
+   "label": "Last Capture",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-07 13:00:00.000000",
+ "modified": "2026-08-30 15:30:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Traffic Fine Portal",

@@ -32,7 +32,7 @@ from transport.transport.fine_sync.base import (
 	FetchedFine,
 	FetchResult,
 )
-from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
+from transport.transport.fine_sync.operator_fetcher import OperatorAssistedFetcher
 
 FINES_URL = "https://www.tamm.abudhabi/wb/adp/pay-traffic-fines/companies?lang=en&companyTcf={tcf}"
 
@@ -43,19 +43,6 @@ TABLE_MARKER = "Fine Number"
 # TAMM's own session identifier. Its expiry is what decides whether a banked
 # sign-in is still usable - roughly 90 minutes from login, in practice.
 SESSION_COOKIE = "jt-prod_sid"
-
-# While the browser sits on any of these, it is mid-authentication and must be
-# left completely alone - navigating would abandon a half-finished sign-in.
-AUTH_URL_MARKERS = (
-	"uaepass",
-	"/login",
-	"signin",
-	"sign-in",
-	"sso",
-	"openid",
-	"authorize",
-	"oauth",
-)
 
 MONTHS = {
 	"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -160,115 +147,17 @@ READ_PANEL_JS = """
 """
 
 
-class TammFetcher(BrowserFetcher):
+class TammFetcher(OperatorAssistedFetcher):
 	"""Operator-assisted. Opens a real window and waits for a human to sign in."""
 
-	# The whole point: the operator must be able to see and use this window.
-	headless = False
+	session_filename = "tamm.json"
+	# Names the cookie BrowserFetcher.session_status() reads to date the sign-in.
+	session_cookie_name = SESSION_COOKIE
 
-	# UAE Pass involves a push notification to a phone, so the wait has to be
-	# measured in minutes. It ends the moment the session is live, not on a timer.
-	login_timeout_ms = 2700000
-	poll_interval_ms = 3000
-	# Long enough that a person is never interrupted mid-flow, short enough that
-	# a completed login is picked up without them having to do anything else.
-	renavigate_after_ms = 30000
-	# The fines table is rendered by a SPA some seconds after the navigation
-	# resolves, so an unattended run that checks once the moment the page loads
-	# reports "no session" for a session that is perfectly alive. Bounded, so a
-	# genuinely dead session still fails fast rather than hanging a worker.
-	unattended_grace_ms = 90000
 	# Comfortably more pages than a fleet's fine list should ever run to; the
 	# walk stops on "nothing new" long before this, and this only bounds a
 	# pager that would otherwise cycle.
 	max_pages = 25
-
-	def __init__(self, portal, credential=None):
-		super().__init__(portal, credential)
-		self._context = None
-
-	# -- session -----------------------------------------------------------
-	def session_path(self):
-		"""Where the signed-in session is kept between runs.
-
-		A Chrome *profile directory* is not enough. TAMM and UAE Pass hand out
-		**session cookies**, which a browser discards on close by design, so
-		every run started from a profile alone demanded a fresh UAE Pass push -
-		which is exactly the thing that makes an operator stop using this.
-		Playwright's storage_state captures session cookies too, so restoring it
-		into a new context resumes the session properly.
-
-		It lives under the site's *private* files, never `public/files`, which
-		is served over HTTP to anyone holding the path. This file is a live
-		credential for a government portal; treat it as one.
-		"""
-		import os
-
-		import frappe
-
-		directory = frappe.get_site_path("private", "portal-sessions")
-		os.makedirs(directory, exist_ok=True)
-		# makedirs' mode argument is filtered through the process umask, which on a
-		# normal bench leaves this group- and world-readable. Set it outright.
-		os.chmod(directory, 0o700)
-		return os.path.join(directory, "tamm.json")
-
-	def start(self):
-		if self._page:
-			return self._page
-
-		import os
-
-		from transport.transport.fine_sync.browser_fetcher import get_playwright
-
-		sync_playwright = get_playwright()
-		self._pw = sync_playwright().start()
-		self._browser = self._pw.chromium.launch(headless=self.headless)
-
-		saved = self.session_path()
-		options = {"viewport": {"width": 1500, "height": 950}}
-		if os.path.exists(saved):
-			options["storage_state"] = saved
-
-		self._context = self._browser.new_context(**options)
-		self._page = self._context.new_page()
-		self._page.set_default_timeout(self.timeout_ms)
-		return self._page
-
-	def save_session(self):
-		"""Persist the signed-in session. Called as soon as login succeeds.
-
-		Saved at that moment rather than at the end of the run, so a failure
-		anywhere later still leaves the operator's sign-in banked instead of
-		asking them to do it all again.
-		"""
-		if not self._context:
-			return
-
-		import os
-
-		try:
-			path = self.session_path()
-			self._context.storage_state(path=path)
-			# This file is a live government-portal session. Owner-only, always -
-			# Playwright writes it with the default umask otherwise.
-			os.chmod(path, 0o600)
-		except Exception:
-			# Losing the session cache is a nuisance, never a reason to fail a
-			# run that has already fetched real data.
-			pass
-
-	def close(self):
-		for closer in (
-			lambda: self._context and self._context.close(),
-			lambda: self._browser and self._browser.close(),
-			lambda: self._pw and self._pw.stop(),
-		):
-			try:
-				closer()
-			except Exception:
-				pass
-		self._page = self._context = self._browser = self._pw = None
 
 	def fetch_for_vehicle(self, plate_parts):
 		raise NotImplementedError(
@@ -285,32 +174,12 @@ class TammFetcher(BrowserFetcher):
 		browser, fails to find the table, and records a Failed run. Overnight
 		that is a Failed run and an error log every half hour, all of them noise
 		describing the same expected condition: nobody has signed in lately.
+
+		The cost of that quiet is that a lapsed session looks exactly like a
+		healthy idle one from the outside, so `session_status()` - which this
+		now defers to - reports the same reading in a form an operator can read.
 		"""
-		import json
-		import os
-		import time
-
-		path = self.session_path()
-		if not os.path.exists(path):
-			return False
-		try:
-			with open(path) as fh:
-				state = json.load(fh)
-		except Exception:
-			return False
-
-		for cookie in state.get("cookies", []):
-			if cookie.get("name") != SESSION_COOKIE:
-				continue
-			expires = cookie.get("expires")
-			if expires is None or expires < 0:
-				# A true session cookie carries no expiry; it may or may not
-				# still be good, and only the portal can say. Worth one attempt.
-				return True
-			# A minute of headroom, so a session about to lapse mid-fetch does
-			# not get started at all.
-			return expires > time.time() + 60
-		return False
+		return self.session_status()["usable"]
 
 	def fetch_for_traffic_file(self, traffic_file_number, include_details=False, wait_for_login=True):
 		"""Fetch the whole traffic file.
@@ -413,11 +282,6 @@ class TammFetcher(BrowserFetcher):
 			page.wait_for_timeout(self.poll_interval_ms)
 			waited += self.poll_interval_ms
 		return False
-
-	def _on_auth_page(self, page):
-		"""True while the browser is on a sign-in host we must not interrupt."""
-		url = (page.url or "").lower()
-		return any(marker in url for marker in AUTH_URL_MARKERS)
 
 	def _table_present(self, page):
 		try:

@@ -223,7 +223,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Responsibility",
-   "options": "Driver\nCompany\nCustomer",
+   "options": "\nDriver\nCompany\nCustomer",
    "reqd": 1
   },
   {
@@ -304,7 +304,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-29 12:00:00.000000",
+ "modified": "2026-08-30 15:15:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Traffic Fine",

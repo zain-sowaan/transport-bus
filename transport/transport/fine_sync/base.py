@@ -69,6 +69,12 @@ class FineFetcher:
 	beyond the life of a run.
 	"""
 
+	# Whether this fetcher can actually parse a result page yet. False means the
+	# portal's post-login structure has never been captured, so callers must not
+	# offer a fetch - a scraper written against imagined selectors would appear
+	# to work, return nothing, and be read as "this vehicle has no fines".
+	fetch_implemented = True
+
 	# Wall-clock budget for the fetching itself, in seconds; None is unbounded.
 	# The caller sets it, but the fetcher decides when to start the clock, so
 	# that waiting for a person to sign in never spends time meant for reading

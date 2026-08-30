@@ -85,6 +85,65 @@ class BrowserFetcher(FineFetcher):
 				pass
 		self._page = self._browser = self._pw = None
 
+	# -- banked sessions ---------------------------------------------------
+	# A portal that a person signs into banks the session so later runs need no
+	# second sign-in. Subclasses doing this name their session cookie and
+	# override session_path(); the rest inherit "this portal has no session".
+	session_cookie_name = None
+
+	def session_path(self):
+		return None
+
+	def session_status(self):
+		"""What the banked sign-in is worth right now. Opens no browser.
+
+		Reads the session cookie's *expiry* and nothing else - never its value -
+		so the result is safe to hand to the desk. Callers get a state rather
+		than a bool because "nobody has ever signed in here" and "the sign-in
+		lapsed twenty minutes ago" need different things said to an operator,
+		even though neither can fetch.
+
+		States: unsupported / none / expired / unknown / live.
+		"""
+		import json
+		import os
+		import time
+
+		none = {"state": "none", "usable": False, "seconds_left": None}
+
+		path = self.session_path()
+		if not (path and self.session_cookie_name):
+			return {"state": "unsupported", "usable": False, "seconds_left": None}
+
+		if not os.path.exists(path):
+			return none
+		try:
+			with open(path) as fh:
+				banked = json.load(fh)
+		except Exception:
+			# A half-written or unreadable state file is worth exactly what no
+			# session is worth, and reporting that beats raising during a form load.
+			return none
+
+		for cookie in banked.get("cookies", []):
+			if cookie.get("name") != self.session_cookie_name:
+				continue
+			expires = cookie.get("expires")
+			if expires is None or expires < 0:
+				# A true session cookie carries no expiry; whether it still works is
+				# something only the portal can answer. Worth one attempt.
+				return {"state": "unknown", "usable": True, "seconds_left": None}
+			# A minute of headroom, so a session about to lapse mid-fetch is never
+			# started at all.
+			left = int(expires - time.time())
+			return {
+				"state": "live" if left > 60 else "expired",
+				"usable": left > 60,
+				"seconds_left": left,
+			}
+
+		return none
+
 	# -- guards ------------------------------------------------------------
 	def assert_no_captcha(self):
 		"""Stop the moment a CAPTCHA appears.

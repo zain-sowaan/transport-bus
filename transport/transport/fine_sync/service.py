@@ -19,7 +19,7 @@ import time
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import format_duration, now_datetime
 
 from transport.transport.fine_sync.base import FineFetchError
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
@@ -365,8 +365,44 @@ def _stage_fine(run, portal_doc, vehicle, fine):
 
 
 @frappe.whitelist()
-def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, wait_for_login=1):
-	"""Fetch a whole company traffic file with a person completing the sign-in.
+def run_operator_assisted_sync(
+	portal, traffic_file_number, include_details=0, wait_for_login=1, skip_if_busy=0
+):
+	"""Fetch a whole company traffic file, one run at a time.
+
+	The lock is the point of this wrapper. Two runs against one portal means two
+	browsers restoring the same banked session, and the portal responds by
+	invalidating it - which costs the operator a fresh UAE Pass push and makes
+	the *next* scheduled sweep fail too. It has happened here: a manual fetch
+	and a scheduled one started fourteen seconds apart, both on the same TAMM
+	session. Guarding only the scheduled path left the button free to collide
+	with it, so the lock lives here, where every caller must pass through it.
+
+	`skip_if_busy` distinguishes the two callers. A person who pressed a button
+	deserves to be told why nothing happened; a 45-minute cron finding a run
+	already going is ordinary, and should say so without filing an error.
+	"""
+	from frappe.utils.synchronization import LockTimeoutError, filelock
+
+	_check_permission()
+
+	try:
+		with filelock(f"fine_sync_{portal}", timeout=1):
+			return _operator_assisted_sync(
+				portal, traffic_file_number, include_details, wait_for_login
+			)
+	except LockTimeoutError:
+		if int(skip_if_busy or 0):
+			return {"skipped": True, "reason": _("A fetch for {0} is already running.").format(portal)}
+		frappe.throw(
+			_("A fetch from {0} is already running. Wait for it to finish - starting a second "
+			  "one would sign the first out of the portal and lose its results.").format(portal),
+			title=_("Fetch Already Running"),
+		)
+
+
+def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait_for_login=1):
+	"""The fetch itself. Always reached through run_operator_assisted_sync's lock.
 
 	Deliberately NOT routed through `get_syncable_portals()`. That gate exists to
 	stop *unattended* access to a portal nobody authorized, and it turns
@@ -382,8 +418,6 @@ def run_operator_assisted_sync(portal, traffic_file_number, include_details=0, w
 	Cannot be scheduled: `run_scheduled_syncs` only walks syncable portals, and
 	this one is not among them.
 	"""
-	_check_permission()
-
 	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
 	if not portal_doc.has_written_authorization:
 		frappe.throw(
@@ -508,6 +542,208 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 	}
 
 
+def describe_session_status(status):
+	"""Turn a session reading into the sentence a person gets told.
+
+	One wording, two audiences: the banner on the portal form and the note the
+	scheduled sweep leaves behind. They were drifting apart - the form said "the
+	session expired 31m ago" while the sweep recorded a flat "no usable
+	session" - and an operator comparing the two had no way to know they
+	described the same thing.
+	"""
+	left = status.get("seconds_left")
+	span = format_duration(abs(left), hide_days=True) if left is not None else None
+
+	if status.get("state") == "live":
+		status["indicator"] = "green"
+		status["message"] = _(
+			"Signed-in session is live for about another {0}. Scheduled syncs can run "
+			"unattended until it lapses."
+		).format(span)
+	elif status.get("state") == "expired":
+		status["indicator"] = "red"
+		status["message"] = _(
+			"The signed-in session expired {0} ago. Scheduled syncs are doing nothing "
+			"until someone signs in again - use Fetch Fines Now."
+		).format(span)
+	elif status.get("state") == "none":
+		status["indicator"] = "orange"
+		status["message"] = _(
+			"No sign-in is banked for this portal. Nothing can be fetched, on a schedule "
+			"or otherwise, until someone signs in - use Fetch Fines Now."
+		)
+	elif status.get("state") == "unknown":
+		status["indicator"] = "blue"
+		status["message"] = _(
+			"A session is banked, but the portal does not date it, so whether it still "
+			"works can only be found out by trying."
+		)
+	else:
+		# Anything else means the portal banks no session this code can date -
+		# today because no fetcher does, later because a portal's session cookie
+		# has not been named yet. Falling through left the banner blank and the
+		# sweep saying "no signed-in session" about a portal that may well have
+		# one, which is the silent dead end this whole path exists to remove.
+		status["indicator"] = "gray"
+		status["message"] = _(
+			"This portal does not bank a datable sign-in, so how much life is left in "
+			"one cannot be reported here."
+		)
+	return status
+
+
+@frappe.whitelist()
+def get_portal_session_status(portal):
+	"""How much life is left in an operator's banked sign-in, for the desk.
+
+	Exists because a lapsed session is otherwise invisible on the form. The
+	scheduled entry point skips a portal with no live session on purpose - a
+	browser opened every 45 minutes to fail would bury the log in noise - so
+	without this an operator has no way to know whether the automation can
+	currently do anything at all.
+
+	Opens no browser and contacts no portal: it dates the banked session cookie
+	on disk, and never reads its value.
+	"""
+	if not frappe.has_permission("Traffic Fine Portal", "read", doc=portal):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	try:
+		fetcher = get_fetcher(portal_doc)
+	except Exception:
+		# No fetcher at all for this portal. Reported rather than hidden,
+		# because the Fetch Fines button used to appear here and fail with a
+		# message about a missing traffic file number - which sent the operator
+		# off to add a credential that would not have helped.
+		return {
+			"state": "unsupported",
+			"usable": False,
+			"fetch_implemented": False,
+			"can_capture": False,
+			"indicator": "orange",
+			"message": _(
+				"No fetcher is implemented for {0}, so fines cannot be collected from it "
+				"yet - by hand or on a schedule. This is not a credential or "
+				"authorization problem."
+			).format(portal_doc.name),
+		}
+
+	reader = getattr(fetcher, "session_status", None)
+	status = describe_session_status(
+		reader() if reader else {"state": "unsupported", "usable": False}
+	)
+	status["fetch_implemented"] = bool(getattr(fetcher, "fetch_implemented", True))
+	status["can_capture"] = hasattr(fetcher, "capture_signed_in")
+
+	if not status["fetch_implemented"]:
+		# Say what is actually missing. "No live session" would be true and
+		# useless here - signing in would not help, because nothing can read
+		# the pages a sign-in reaches.
+		status["indicator"] = "orange"
+		status["message"] = _(
+			"{0} cannot be fetched yet: its pages behind the sign-in have never been "
+			"captured, so there is nothing to read them with. Signing in will not change "
+			"that - run Capture Portal Pages with an operator signed in, and the fetch "
+			"can be written from what it records."
+		).format(portal_doc.name)
+
+	return status
+
+
+@frappe.whitelist()
+def enqueue_portal_capture(portal):
+	"""Queue the capture step for a portal whose pages have never been read.
+
+	Separate from a fetch on purpose. A fetch claims to collect liabilities; a
+	capture claims only to record what the portal looks like, and it is the
+	honest thing to offer for a portal we cannot yet parse. Offering "Fetch
+	Fines Now" there instead produced a run that failed for reasons the
+	operator could do nothing about.
+
+	Queued rather than run inline for the same reason a fetch is: it opens a
+	browser and waits for a person.
+	"""
+	_check_permission()
+
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	if not portal_doc.has_written_authorization:
+		frappe.throw(
+			_("Record the written authorization for {0} before opening it at all - a "
+			  "capture reads the portal just as a fetch does.").format(portal_doc.name),
+			title=_("Authorization Required"),
+		)
+
+	fetcher = get_fetcher(portal_doc)
+	if not hasattr(fetcher, "capture_signed_in"):
+		frappe.throw(
+			_("{0} has no capture step - its pages are already implemented.").format(portal_doc.name),
+			title=_("Nothing to Capture"),
+		)
+
+	frappe.enqueue(
+		"transport.transport.fine_sync.service.run_portal_capture",
+		queue="long",
+		timeout=3600,
+		portal=portal_doc.name,
+	)
+	return {
+		"queued": True,
+		"message": _(
+			"Capture queued. A browser window will open - sign in, then walk to the fines "
+			"list and page through it. Every page you visit is recorded. Close the window "
+			"when you are done."
+		),
+	}
+
+
+def run_portal_capture(portal):
+	"""Run the capture and write what it found onto the portal record."""
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	fetcher = get_fetcher(portal_doc)
+
+	# Nothing may sit in an open transaction across a capture: it runs to
+	# twenty-five minutes waiting on a person, and a worker holding a
+	# transaction that long is what locked the naming series and took a
+	# Rental Vehicle read down with it.
+	frappe.db.commit()
+
+	report = None
+	try:
+		report = fetcher.capture_signed_in()
+	finally:
+		fetcher.close()
+		if report is None:
+			# The capture threw rather than returning. Say so on the record, so
+			# a client sign-in that produced nothing is not silently ascribed to
+			# a portal that simply had no pages.
+			frappe.db.set_value(
+				"Traffic Fine Portal",
+				portal_doc.name,
+				"last_capture_summary",
+				_("Capture ended unexpectedly and reported nothing. Check the Error Log, "
+				  "and look under private/portal-captures for any pages written before it "
+				  "stopped."),
+				update_modified=False,
+			)
+			frappe.db.commit()
+
+	frappe.db.set_value(
+		"Traffic Fine Portal",
+		portal_doc.name,
+		"last_capture_summary",
+		_("{0} page(s) recorded to {1}. Session cookies seen: {2}. Session banked: {3}.").format(
+			report["pages_captured"],
+			report["capture_file"],
+			", ".join(report["cookie_names"]) or _("none"),
+			_("yes") if report["session_banked"] else _("no"),
+		),
+		update_modified=False,
+	)
+	frappe.db.commit()
+	return report
+
+
 def run_scheduled_operator_syncs():
 	"""Pick up new fines automatically, but only while an operator's session lives.
 
@@ -520,24 +756,60 @@ def run_scheduled_operator_syncs():
 	  phone. Waiting for one on a schedule would leave a browser hung until the
 	  next fire, and at a 45-minute cadence those stack up until the box dies.
 	  No live session simply means no run.
-	* **Never overlaps itself.** The lock is taken with a 1-second timeout, so a
-	  fire that finds one in progress gives up instead of queueing behind it.
+	* **Never overlaps itself.** `run_operator_assisted_sync` holds the portal
+	  lock; this passes `skip_if_busy` so a collision is reported, not filed as
+	  an error.
 
-	Its useful window is the ~90 minutes a TAMM session lasts after a person
-	signs in; outside that it costs a file check and returns.
+	**It hands the fetch to the `long` queue rather than doing it here.** Frappe
+	picks a job's queue from its frequency alone - `get_queue_name()` returns
+	`long` only for "Daily Long" and maintenance jobs - so this Cron job runs on
+	`default`, shoulder to shoulder with the */5 trip reminders and the
+	driver-confirmation escalation. Fetching inline held a default worker for
+	the whole browser run, up to the 30-minute ceiling: long enough to swallow
+	six consecutive escalation cycles without a trace. Enqueueing is what keeps
+	a slow portal from becoming a late escalation.
+
+	Whatever it decides, it writes down why. Skipping quietly was costing more
+	than it saved: the Scheduled Job Log records "Complete" for a sweep that
+	fetched the whole fleet and for one that found no session, no credential, or
+	a disabled flag, and nothing anywhere distinguished them.
 	"""
-	if not frappe.db.get_single_value("Transport Settings", "enable_scheduled_fine_sync"):
-		return
+	notes = []
 
-	from frappe.utils.synchronization import LockTimeoutError, filelock
+	if not frappe.db.get_single_value("Transport Settings", "enable_scheduled_fine_sync"):
+		_record_sweep_note(_("Skipped: Traffic Fine Sync is switched off in Transport Settings."))
+		return
 
 	portals = frappe.get_all(
 		"Traffic Fine Portal",
 		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
 		fields=["name", "fetcher_key"],
 	)
+	if not portals:
+		_record_sweep_note(
+			_("Nothing to do: no operator-assisted portal has its written authorization on record.")
+		)
+		return
 
 	for portal in portals:
+		# Whether anything can read this portal is checked before whether a
+		# credential exists, because otherwise the note blames the credential:
+		# it sent an operator off to add a traffic file number to a portal that
+		# has no fetcher, which would not have helped and did not.
+		portal_doc = frappe.get_doc("Traffic Fine Portal", portal.name)
+		try:
+			fetcher = get_fetcher(portal_doc)
+		except Exception:
+			notes.append(_("{0}: no fetcher is implemented for this portal.").format(portal.name))
+			continue
+
+		if not getattr(fetcher, "fetch_implemented", True):
+			notes.append(
+				_("{0}: its pages behind the sign-in have not been captured yet, so nothing "
+				  "can read them. Run Capture Portal Pages on the portal record.").format(portal.name)
+			)
+			continue
+
 		traffic_file_number = frappe.db.get_value(
 			"Traffic Fine Portal Credential",
 			{"portal": portal.name, "is_active": 1},
@@ -546,30 +818,61 @@ def run_scheduled_operator_syncs():
 		if not traffic_file_number:
 			# Without a traffic file there is nothing to query; a per-vehicle
 			# fallback would be a different (and much slower) thing entirely.
-			continue
-
-		portal_doc = frappe.get_doc("Traffic Fine Portal", portal.name)
-		try:
-			fetcher = get_fetcher(portal_doc)
-		except Exception:
+			notes.append(_("{0}: no active credential carrying a traffic file number.").format(portal.name))
 			continue
 
 		# Check for a banked session before opening anything at all.
-		has_session = getattr(fetcher, "has_saved_session", None)
-		if not (has_session and has_session()):
+		status = describe_session_status(
+			fetcher.session_status() if hasattr(fetcher, "session_status") else {}
+		)
+		if not status.get("usable"):
+			notes.append(
+				_("{0}: not fetched - {1}").format(
+					portal.name,
+					status.get("message")
+					or _("this portal banks no signed-in session, so nothing can be fetched unattended."),
+				)
+			)
 			continue
 
-		try:
-			with filelock(f"fine_sync_{portal.name}", timeout=1):
-				run_operator_assisted_sync(
-					portal.name, traffic_file_number, include_details=1, wait_for_login=0
-				)
-		except LockTimeoutError:
-			# A run is already going. Skipping is correct - two browsers sharing
-			# one portal session is how a session gets invalidated.
-			continue
-		except Exception:
-			frappe.log_error(title=f"Scheduled operator-assisted sync failed: {portal.name}")
+		frappe.enqueue(
+			"transport.transport.fine_sync.service.run_operator_assisted_sync",
+			queue="long",
+			timeout=3600,
+			portal=portal.name,
+			traffic_file_number=traffic_file_number,
+			include_details=1,
+			wait_for_login=0,
+			skip_if_busy=1,
+		)
+		notes.append(_("{0}: session live, fetch queued on the long worker.").format(portal.name))
+
+	_record_sweep_note("\n".join(notes))
+
+
+def _record_sweep_note(note):
+	"""Leave the sweep's reasoning somewhere a person can read it.
+
+	Onto Transport Settings rather than the Error Log, because none of these
+	outcomes is an error - "nobody has signed in lately" is the normal state of
+	an operator-assisted portal - and filing them as errors every 45 minutes is
+	the noise this whole path was built to avoid. It is a status, so it lives
+	where the switch that controls it lives.
+	"""
+	try:
+		frappe.db.set_value(
+			"Transport Settings",
+			"Transport Settings",
+			{
+				"last_operator_sweep_note": note,
+				"last_operator_sweep_on": now_datetime(),
+			},
+			update_modified=False,
+		)
+		frappe.db.commit()
+	except Exception:
+		# A note that cannot be written must never take the sweep down with it.
+		frappe.log_error(title="Could not record operator sweep note")
 
 
 def _enrich_staging_row(name, vehicle, fine):
