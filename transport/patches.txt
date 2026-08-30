@@ -14,3 +14,4 @@ transport.patches.seed_traffic_fine_portals
 transport.patches.move_rate_calculation_to_vehicle_rows
 transport.patches.seed_expense_claim_types
 transport.patches.update_srta_verified_reference
+transport.patches.clear_fabricated_trip_actual_times
