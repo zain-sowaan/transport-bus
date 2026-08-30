@@ -37,7 +37,12 @@ class TrafficFineSyncRun(Document):
 		Any failure downgrades it, so a partially-successful sync can never be
 		read as a full picture of the fleet's liabilities.
 		"""
-		self.vehicles_queried = len(self.vehicles)
+		# Distinct vehicles, not child rows. The unattended path appends one row
+		# per vehicle, but the operator-assisted path queries a whole traffic
+		# file at once and appends one row per *fine* - so counting rows
+		# reported 53 vehicles queried against a fleet of 23, and a run that
+		# read one plate twice looked like it had covered two.
+		self.vehicles_queried = len({v.vehicle for v in self.vehicles if v.vehicle})
 		self.vehicles_failed = sum(1 for v in self.vehicles if v.status == "Failed")
 		self.fines_found = sum(v.fines_found or 0 for v in self.vehicles)
 		self.finished_on = now_datetime()
