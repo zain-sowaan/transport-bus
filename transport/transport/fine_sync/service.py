@@ -21,9 +21,9 @@ from datetime import datetime, timezone
 
 import frappe
 from frappe import _
-from frappe.utils import format_duration, now_datetime
+from frappe.utils import format_datetime, format_duration, now_datetime
 
-from transport.transport.fine_sync.base import FineFetchError
+from transport.transport.fine_sync.base import AuthenticationRequired, FineFetchError
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
 from transport.transport.fine_sync.registry import get_fetcher, is_supported
 from transport.transport.vehicle_plate import PLATE_FIELDS
@@ -441,7 +441,7 @@ def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait
 	# open transaction across that.
 	_checkpoint()
 
-	fetcher, error_log, staged = None, None, 0
+	fetcher, error_log, staged, reason = None, None, 0, None
 	try:
 		fetcher = get_fetcher(portal_doc)
 		# The fetcher arms this itself once the sign-in is done, so an operator
@@ -482,9 +482,14 @@ def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait
 			# The fetcher's message is the only place that records the list was
 			# cut short rather than exhausted, so it has to land on the run.
 			error_log = result.message
-	except Exception:
+			reason = result.message
+	except Exception as exc:
 		run.status = "Failed"
 		error_log = frappe.get_traceback()
+		# One readable line beside the traceback, not instead of it. The sweep
+		# writes its outcome onto a settings field nobody would read a traceback
+		# out of, and the traceback still has to stay intact on the run.
+		reason = _describe_fetch_failure(exc)
 		frappe.log_error(title=f"Operator-assisted fine sync failed: {portal_doc.name}")
 	finally:
 		if fetcher:
@@ -501,6 +506,7 @@ def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait
 		"status": run.status,
 		"fines_found": run.fines_found,
 		"fines_new": run.fines_new,
+		"reason": reason,
 	}
 
 
@@ -817,8 +823,85 @@ def run_portal_capture(portal):
 	return report
 
 
+SWEEP_JOB_ID = "transport_operator_fine_sweep"
+
+
 def run_scheduled_operator_syncs():
-	"""Pick up new fines automatically, but only while an operator's session lives.
+	"""The scheduled entry point. Decides whether there is anything to do, and
+	hands the doing to the long queue.
+
+	**It hands the fetch to the `long` queue rather than doing it here.** Frappe
+	picks a job's queue from its frequency alone - `get_queue_name()` returns
+	`long` only for "Daily Long" and maintenance jobs - so this Cron job runs on
+	`default`, shoulder to shoulder with the */5 trip reminders and the
+	driver-confirmation escalation. Fetching inline held a default worker for
+	the whole browser run, up to the 30-minute ceiling: long enough to swallow
+	six consecutive escalation cycles without a trace. Enqueueing is what keeps
+	a slow portal from becoming a late escalation.
+
+	So this half stays cheap: two reads and an enqueue, done in milliseconds.
+	Everything that can take time - opening a browser, restoring a session,
+	walking pages - happens in `run_operator_sweep` on the long worker, which is
+	also where the outcome is written down.
+	"""
+	if not frappe.db.get_single_value("Transport Settings", "enable_scheduled_fine_sync"):
+		_record_sweep_note(_("Skipped: Traffic Fine Sync is switched off in Transport Settings."))
+		return
+
+	portals = frappe.get_all(
+		"Traffic Fine Portal",
+		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
+		fields=["name"],
+	)
+	if not portals:
+		_record_sweep_note(
+			_("Nothing to do: no operator-assisted portal has its written authorization on record.")
+		)
+		return
+
+	# One fetch may run for the whole time budget and they run one after
+	# another, so the ceiling grows with the number of portals - ten minutes each
+	# on top of the budget for browser start-up and the sign-in check, five more
+	# for the bookkeeping around the loop. Capped at two budgets, because most
+	# portals cost milliseconds (no fetcher, or they need a person for every
+	# search) and at most a couple can ever fetch unattended. Past two full
+	# budgets a check is stuck, and it is holding both the long worker and the
+	# slot that keeps the next fire from starting. Being cut short there is safe:
+	# the closing note says which portals it never reached.
+	budget = _sweep_budget_seconds() or 1800
+	timeout = int(min(len(portals) * (budget + 600) + 300, 2 * budget + 900))
+
+	# Deduplicated because a fetch can outlive the 45-minute gap to the next
+	# fire. Without this, a second sweep would start against a portal the first
+	# one is still signed in to, which is how a session gets invalidated.
+	job = frappe.enqueue(
+		"transport.transport.fine_sync.service.run_operator_sweep",
+		queue="long",
+		timeout=timeout,
+		job_id=SWEEP_JOB_ID,
+		deduplicate=True,
+	)
+	if not job:
+		# enqueue() returns nothing when it drops a duplicate. Reporting that as
+		# "queued" would be the same lie this whole path exists to stop.
+		started = frappe.db.get_single_value("Transport Settings", "last_operator_sweep_on")
+		_record_sweep_note(
+			_("A fetch started at {0} is still running, so this check queued nothing. The next "
+			  "check is in 45 minutes.").format(format_datetime(started) if started else _("an earlier check")),
+			stamp=False,
+		)
+		return
+
+	_record_sweep_note(
+		_("Checking {0} portal(s) now on the long worker. The Scheduled Job Log only records "
+		  "that this check was queued, so it says \"Complete\" either way - what the fetch "
+		  "actually found appears here when it finishes.").format(len(portals))
+	)
+
+
+def run_operator_sweep():
+	"""Fetch from every operator-assisted portal that can be fetched from, and
+	write down what happened to each one.
 
 	Deliberately does nothing far more often than it does something, and that is
 	the design rather than a shortcoming:
@@ -833,104 +916,187 @@ def run_scheduled_operator_syncs():
 	  lock; this passes `skip_if_busy` so a collision is reported, not filed as
 	  an error.
 
-	**It hands the fetch to the `long` queue rather than doing it here.** Frappe
-	picks a job's queue from its frequency alone - `get_queue_name()` returns
-	`long` only for "Daily Long" and maintenance jobs - so this Cron job runs on
-	`default`, shoulder to shoulder with the */5 trip reminders and the
-	driver-confirmation escalation. Fetching inline held a default worker for
-	the whole browser run, up to the 30-minute ceiling: long enough to swallow
-	six consecutive escalation cycles without a trace. Enqueueing is what keeps
-	a slow portal from becoming a late escalation.
-
-	Whatever it decides, it writes down why. Skipping quietly was costing more
-	than it saved: the Scheduled Job Log records "Complete" for a sweep that
-	fetched the whole fleet and for one that found no session, no credential, or
-	a disabled flag, and nothing anywhere distinguished them.
+	Whatever it decides, it writes down why - and this is the half that can say
+	how the fetch *ended*, because it is the half that waits for it. An earlier
+	version queued each fetch separately and recorded "queued", which was true
+	at the moment it was written and useless a minute later: the run's outcome
+	lived only in the Sync Run list, and nothing connected the two. Skipping
+	quietly had cost the same way, the Scheduled Job Log recording "Complete"
+	for a sweep that fetched the whole fleet and for one that found no session,
+	no credential, or a disabled flag.
 	"""
-	notes = []
-
 	if not frappe.db.get_single_value("Transport Settings", "enable_scheduled_fine_sync"):
-		_record_sweep_note(_("Skipped: Traffic Fine Sync is switched off in Transport Settings."))
+		# Re-read rather than trust the half that queued this: the flag can be
+		# turned off while an earlier fetch is still holding the long worker.
+		_record_sweep_note(_("Stopped: Traffic Fine Sync was switched off before this check ran."))
 		return
 
 	portals = frappe.get_all(
 		"Traffic Fine Portal",
 		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
-		fields=["name", "fetcher_key"],
+		fields=["name"],
 	)
-	if not portals:
-		_record_sweep_note(
-			_("Nothing to do: no operator-assisted portal has its written authorization on record.")
-		)
-		return
-
-	for portal in portals:
-		# Whether anything can read this portal is checked before whether a
-		# credential exists, because otherwise the note blames the credential:
-		# it sent an operator off to add a traffic file number to a portal that
-		# has no fetcher, which would not have helped and did not.
-		portal_doc = frappe.get_doc("Traffic Fine Portal", portal.name)
-		try:
-			fetcher = get_fetcher(portal_doc)
-		except Exception:
-			notes.append(_("{0}: no fetcher is implemented for this portal.").format(portal.name))
-			continue
-
-		if not getattr(fetcher, "supports_unattended", True):
-			notes.append(
-				_("{0}: needs a person for every search, not just for sign-in, so it is "
-				  "never fetched on a schedule. Use Fetch Fines Now with an operator "
-				  "present.").format(portal.name)
-			)
-			continue
-
-		if not getattr(fetcher, "fetch_implemented", True):
-			notes.append(
-				_("{0}: its pages behind the sign-in have not been captured yet, so nothing "
-				  "can read them. Run Capture Portal Pages on the portal record.").format(portal.name)
-			)
-			continue
-
-		traffic_file_number = frappe.db.get_value(
-			"Traffic Fine Portal Credential",
-			{"portal": portal.name, "is_active": 1},
-			"traffic_file_number",
-		)
-		if not traffic_file_number:
-			# Without a traffic file there is nothing to query; a per-vehicle
-			# fallback would be a different (and much slower) thing entirely.
-			notes.append(_("{0}: no active credential carrying a traffic file number.").format(portal.name))
-			continue
-
-		# Check for a banked session before opening anything at all.
-		status = portal_session_reading(fetcher, portal_doc)
-		if not status.get("usable"):
-			notes.append(
-				_("{0}: not fetched - {1}").format(
-					portal.name,
-					status.get("message")
-					or _("this portal banks no signed-in session, so nothing can be fetched unattended."),
+	notes = []
+	done = 0
+	try:
+		for portal in portals:
+			notes.append(_sweep_one_portal(portal.name))
+			done += 1
+			if done < len(portals):
+				# Between portals only, never mid-fetch: a note written while a
+				# browser is open would be overwritten seconds later anyway, and
+				# committing mid-fetch is what `_checkpoint` is careful about.
+				_record_sweep_note(
+					"\n".join(
+						[_("Checked {0} of {1} portal(s) so far:").format(done, len(portals))]
+						+ notes
+						+ [_("Still working through the rest...")]
+					),
+					stamp=False,
 				)
+	finally:
+		# In `finally` because the alternative is worse than any error: an rq
+		# timeout or an unexpected raise would leave "checking now" on screen
+		# forever, and someone would read that hours later as a fetch still in
+		# progress.
+		if done < len(portals):
+			notes.append(
+				_("The check stopped before reaching {0} more portal(s). The Error Log has "
+				  "the reason.").format(len(portals) - done)
 			)
-			continue
+		# Counted here rather than taken from the half that queued this. That half
+		# announced a number before the fork, and a portal can lose its written
+		# authorization in between - so the closing note says what this run actually
+		# looked at, and the two can never quietly disagree.
+		header = _("Checked {0} of {1} portal(s):").format(done, len(portals))
+		_record_sweep_note(
+			"\n".join([header] + notes) if notes else _("Nothing to check: no portal qualified."),
+			stamp=False,
+		)
 
-		frappe.enqueue(
-			"transport.transport.fine_sync.service.run_operator_assisted_sync",
-			queue="long",
-			timeout=3600,
-			portal=portal.name,
-			traffic_file_number=traffic_file_number,
+
+def _sweep_one_portal(portal_name):
+	"""Fetch from one portal, or say why not. Always returns a line for the note."""
+	# Whether anything can read this portal is checked before whether a
+	# credential exists, because otherwise the note blames the credential:
+	# it sent an operator off to add a traffic file number to a portal that
+	# has no fetcher, which would not have helped and did not.
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal_name)
+	try:
+		fetcher = get_fetcher(portal_doc)
+	except Exception:
+		return _("{0}: no fetcher is implemented for this portal.").format(portal_name)
+
+	if not getattr(fetcher, "supports_unattended", True):
+		return _(
+			"{0}: needs a person for every search, not just for sign-in, so it is "
+			"never fetched on a schedule. Use Fetch Fines Now with an operator "
+			"present."
+		).format(portal_name)
+
+	if not getattr(fetcher, "fetch_implemented", True):
+		return _(
+			"{0}: its pages behind the sign-in have not been captured yet, so nothing "
+			"can read them. Run Capture Portal Pages on the portal record."
+		).format(portal_name)
+
+	traffic_file_number = frappe.db.get_value(
+		"Traffic Fine Portal Credential",
+		{"portal": portal_name, "is_active": 1},
+		"traffic_file_number",
+	)
+	if not traffic_file_number:
+		# Without a traffic file there is nothing to query; a per-vehicle
+		# fallback would be a different (and much slower) thing entirely.
+		return _("{0}: no active credential carrying a traffic file number.").format(portal_name)
+
+	# Check for a banked session before opening anything at all.
+	status = portal_session_reading(fetcher, portal_doc)
+	if not status.get("usable"):
+		return _("{0}: not fetched - {1}").format(
+			portal_name,
+			status.get("message")
+			or _("this portal banks no signed-in session, so nothing can be fetched unattended."),
+		)
+
+	try:
+		result = run_operator_assisted_sync(
+			portal_name,
+			traffic_file_number,
 			include_details=1,
 			wait_for_login=0,
 			skip_if_busy=1,
 		)
-		notes.append(_("{0}: session live, fetch queued on the long worker.").format(portal.name))
+	except Exception as exc:
+		# Only reaches here if the fetch could not be *started* - a permission
+		# or authorization refusal. Once it starts, `_operator_assisted_sync`
+		# catches its own failures and reports them on the Sync Run.
+		frappe.log_error(title=f"Scheduled fine sweep could not start: {portal_name}")
+		return _("{0}: could not start - {1}").format(portal_name, _describe_fetch_failure(exc))
 
-	_record_sweep_note("\n".join(notes))
+	return _describe_sync_result(portal_name, result)
 
 
-def _record_sweep_note(note):
+def _describe_sync_result(portal_name, result):
+	"""Turn a finished fetch into the one line a person reads on the settings form."""
+	if not result:
+		return _("{0}: the fetch returned no result at all. The Error Log has the detail.").format(
+			portal_name
+		)
+
+	if result.get("skipped"):
+		return _("{0}: not fetched - {1}").format(portal_name, result.get("reason"))
+
+	status = result.get("status")
+	run_name = result.get("sync_run")
+	found = result.get("fines_found") or 0
+	new = result.get("fines_new") or 0
+
+	if status == "Completed":
+		return _("{0}: fetched {1} fine(s), {2} new. Sync run {3}.").format(
+			portal_name, found, new, run_name
+		)
+
+	if status == "Completed with Errors":
+		# Must not read as a clean fetch: this is the truncated case, where part
+		# of the portal's list was never reached.
+		return _(
+			"{0}: only partly fetched - {1} fine(s) read, {2} new, but the run did not "
+			"finish cleanly: {3} Sync run {4} has the detail."
+		).format(portal_name, found, new, result.get("reason") or "", run_name)
+
+	return _("{0}: fetch failed - {1} Sync run {2} has the full error.").format(
+		portal_name, result.get("reason") or _("no reason was recorded."), run_name
+	)
+
+
+def _describe_fetch_failure(exc):
+	"""One readable line for an exception, for a note that has no room for a traceback.
+
+	Kept apart from the traceback rather than replacing it: `error_log` on the
+	Sync Run stays the full traceback, both for diagnosis and because
+	`_apply_portal_verdict` reads the exception's name out of it.
+	"""
+	message = (str(exc) or "").strip()
+	if isinstance(exc, AuthenticationRequired):
+		# The exception already says what the portal did; all this adds is the
+		# remedy, because the note is read by whoever has to act on it and the
+		# remedy is never obvious from a portal's own wording.
+		return _("{0} Nothing scheduled will work until someone signs in from the portal record.").format(
+			message or _("The portal would not accept the saved sign-in.")
+		)
+	if isinstance(exc, FineFetchError):
+		return message or _("the portal could not be read, and gave no reason.")
+	return _("{0}: {1}").format(exc.__class__.__name__, message or _("no message"))
+
+
+def _record_sweep_note(note, stamp=True):
 	"""Leave the sweep's reasoning somewhere a person can read it.
+
+	`stamp` controls the timestamp, not the note. "Last Checked On" means when
+	the current check *started*, so the half-way and closing notes of one check
+	leave it alone - moving it forward on every write would make a fetch that ran
+	for twenty minutes look like it had just begun.
 
 	Onto Transport Settings rather than the Error Log, because none of these
 	outcomes is an error - "nobody has signed in lately" is the normal state of
@@ -942,10 +1108,11 @@ def _record_sweep_note(note):
 		frappe.db.set_value(
 			"Transport Settings",
 			"Transport Settings",
-			{
-				"last_operator_sweep_note": note,
-				"last_operator_sweep_on": now_datetime(),
-			},
+			(
+				{"last_operator_sweep_note": note, "last_operator_sweep_on": now_datetime()}
+				if stamp
+				else {"last_operator_sweep_note": note}
+			),
 			update_modified=False,
 		)
 		frappe.db.commit()

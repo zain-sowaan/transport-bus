@@ -318,14 +318,14 @@
    "label": "Last Automatic Fetch"
   },
   {
-   "description": "When the scheduled fetch last looked at the operator-assisted portals.",
+   "description": "When the last automatic check started. It stays put while the check runs, so a fetch that has been going for twenty minutes does not read as one that just began.",
    "fieldname": "last_operator_sweep_on",
    "fieldtype": "Datetime",
    "label": "Last Checked On",
    "read_only": 1
   },
   {
-   "description": "Why the last scheduled fetch did or did not run. The job log says only \"Complete\" either way, so this is where the reason is kept.",
+   "description": "What the last automatic check did, and what the fetch it started found. The Scheduled Job Log records only that the check was queued, so it reads \"Complete\" either way - the outcome is kept here.",
    "fieldname": "last_operator_sweep_note",
    "fieldtype": "Small Text",
    "label": "What Happened",
