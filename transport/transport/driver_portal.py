@@ -210,9 +210,19 @@ def log_expense(trip_name, expense_type, amount, attachment, remarks=None):
 # --------------------------------------------------------------------------
 
 def check_geofence(place, latitude, longitude):
-	place_lat, place_lng, radius = frappe.db.get_value(
+	# get_value returns None outright when the Place is missing - an empty
+	# from_place on older trip data, or a record that has since gone. Unpacking
+	# that None crashed the driver mid-shift with "cannot unpack non-iterable
+	# NoneType", which tells them nothing and stops the trip starting at all.
+	# Falling through is the same answer the next check already gives: with
+	# nothing to measure against, the geofence cannot object.
+	coordinates = frappe.db.get_value(
 		"Place", place, ["latitude", "longitude", "geofence_radius_meters"]
 	)
+	if not coordinates:
+		return
+
+	place_lat, place_lng, radius = coordinates
 	if not (place_lat and place_lng):
 		# No coordinates on record for this Place - nothing to check against.
 		return
