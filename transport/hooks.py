@@ -120,6 +120,11 @@ required_apps = ["fleetify", "hrms"]
 # running them, so a new site needs this hook too.
 after_install = "transport.setup.after_install"
 
+# Custom Fields are re-checked after every migrate because fixture sync drops a
+# whole file when one DocType in it is missing, and says so only on stdout. See
+# transport/setup.py ensure_custom_fields for what that cost and how.
+after_migrate = "transport.setup.after_migrate"
+
 # before_install = "transport.install.before_install"
 
 # Uninstallation
