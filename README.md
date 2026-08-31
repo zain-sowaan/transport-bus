@@ -13,11 +13,20 @@ bench install-app transport
 bench --site $YOUR_SITE migrate
 ```
 
-`fleetify` and `hrms` must be installed first - `required_apps` will refuse the
-install otherwise. Note that it checks only that they are *present*, not which
-version, so a bench carrying an outdated `fleetify` passes the check while
-missing DocTypes this app attaches Custom Fields to. `bench migrate` reports
-any it had to skip, in the Error Log and in its own output.
+`fleetify` and `hrms` are declared in `required_apps`, so `bench install-app
+transport` installs them onto the site itself before installing this app
+(`frappe/installer.py:287-290`) - it does not refuse and wait for you to do it.
+What it installs is whatever version the bench happens to carry, and it never
+checks which, so a bench holding an outdated `fleetify` satisfies the
+requirement completely while lacking DocTypes this app depends on.
+
+`Place` is the one that bites. Trip, Trip Stop and Route link to it, the driver
+portal's geofence reads it, and the Trip Sheet report shows two columns of it -
+so a stale `fleetify` breaks those flows, not merely the Custom Fields attached
+to it, and it does so with errors that name a column rather than the missing
+app. `bench migrate` names any DocType it had to skip, in its own output and in
+the Error Log. The remedy is to update the dependency in the bench and migrate
+again; nothing in this app can substitute for the DocType being absent.
 
 ### Traffic fine sync (optional)
 
