@@ -18,7 +18,10 @@ transport` installs them onto the site itself before installing this app
 (`frappe/installer.py:287-290`) - it does not refuse and wait for you to do it.
 What it installs is whatever version the bench happens to carry, and it never
 checks which, so a bench holding an outdated `fleetify` satisfies the
-requirement completely while lacking DocTypes this app depends on.
+requirement completely while lacking DocTypes this app depends on. It can only
+install what the bench already has, so a bench carrying no `fleetify` at all
+fails with `App fleetify not in apps.txt` - a message about the bench, not
+about a requirement.
 
 `Place` is the one that bites. Trip, Trip Stop and Route link to it, the driver
 portal's geofence reads it, and the Trip Sheet report shows two columns of it -
@@ -42,9 +45,17 @@ sudo ./env/bin/playwright install-deps chromium   # servers only
 ```
 
 Without them the rest of the app works normally and the fine-sync buttons say
-which step is missing. Two of the portals need an operator signed in through
-UAE Pass, so a headless server also needs a virtual display (Xvfb plus a VNC
-route) for anyone to complete a sign-in.
+which step is missing.
+
+Every portal served by TAMM or by the MOI route needs an operator to sign in
+through UAE Pass, which ends in a push approved on a phone - and MOI puts a
+CAPTCHA on its search form as well, which the operator answers themselves. One
+fetcher covers the whole MOI route, so that is most of the portals, not two of
+them. SRTA is the exception: a public form that needs no sign-in at all.
+
+A headless server therefore needs a virtual display - Xvfb plus a VNC or noVNC
+route - for anyone to complete a sign-in. Scheduled fetches run headless and
+only work after a session has been banked that way.
 
 ### Contributing
 
