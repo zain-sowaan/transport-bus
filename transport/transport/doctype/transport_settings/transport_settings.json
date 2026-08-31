@@ -42,6 +42,7 @@
   "fine_sync_time_budget_minutes",
   "column_break_fine_sync",
   "imported_fine_responsibility",
+  "uae_pass_mobile",
   "sweep_status_section",
   "last_operator_sweep_on",
   "last_operator_sweep_note"
@@ -311,6 +312,12 @@
    "fieldtype": "Select",
    "label": "Default Responsibility for Imported Fines",
    "options": "Company\nDriver\nCustomer"
+  },
+  {
+   "description": "Mobile number registered with UAE Pass for the company identity that signs in to TAMM and MOI. Held so a sign-in can be started without anyone retyping it. It is not a password - the approval still happens on the registered phone - but it is personal data, so it stays on the site and never reaches the app's code or fixtures.",
+   "fieldname": "uae_pass_mobile",
+   "fieldtype": "Data",
+   "label": "UAE Pass Mobile Number"
   },
   {
    "fieldname": "sweep_status_section",
