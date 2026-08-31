@@ -19,9 +19,14 @@ transport` installs them onto the site itself before installing this app
 What it installs is whatever version the bench happens to carry, and it never
 checks which, so a bench holding an outdated `fleetify` satisfies the
 requirement completely while lacking DocTypes this app depends on. It can only
-install what the bench already has, so a bench carrying no `fleetify` at all
-fails with `App fleetify not in apps.txt` - a message about the bench, not
-about a requirement.
+install what the bench already has, and how it fails depends on how the app is
+missing. With no `fleetify` in the bench at all, the nested install raises
+`ModuleNotFoundError: No module named 'fleetify'` from `get_hooks`
+(`frappe/__init__.py:1596-1602`), before any apps.txt check is reached; the
+line above it prints `Could not find app "fleetify":`. Only when the app is on
+disk but absent from `sites/apps.txt` does it get as far as `App fleetify not
+in apps.txt` (`installer.py:295`). Both describe the bench rather than a
+requirement, which is what makes them hard to place.
 
 `Place` is the one that bites. Trip, Trip Stop and Route link to it, the driver
 portal's geofence reads it, and the Trip Sheet report shows two columns of it -
