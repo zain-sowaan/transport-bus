@@ -3,12 +3,21 @@
 
 """Headless-browser fetching, plus the capture mode that has to come first.
 
-Playwright is imported lazily and is NOT a dependency of the app. The browser
-belongs in a sidecar, not in the ERP runtime, and the app must keep working on
-sites that will never run a fine sync. To enable it:
+Playwright is imported lazily and is NOT a base dependency of the app. The
+browser belongs in a sidecar, not in the ERP runtime, and the app must keep
+working on sites that will never run a fine sync - most of them. It is declared
+instead as the `fines` extra in pyproject.toml, so the version is pinned and
+the install is a named step rather than tribal knowledge:
 
-    ./env/bin/pip install playwright
+    ./env/bin/pip install -e "apps/transport[fines]"
     ./env/bin/playwright install chromium
+
+The second line is not optional and cannot be a packaging dependency: Chromium
+is a browser binary Playwright downloads, not a Python distribution. On a
+server the libraries it links against are a third step again,
+`sudo ./env/bin/playwright install-deps chromium`. Each of the three has its
+own error message below, because "it does not work" otherwise looks identical
+from the desk.
 
 **On the current state of every portal:** no backend request has been captured
 for any of the 13, so no scraper can be written that would actually parse a
@@ -39,12 +48,40 @@ def get_playwright():
 	except ImportError:
 		frappe.throw(
 			frappe._(
-				"Playwright is not installed in this bench. Install it with:<br>"
-				"<code>./env/bin/pip install playwright</code><br>"
+				"Playwright is not installed in this bench. It ships as this app's "
+				"<code>fines</code> extra, so it is two steps:<br>"
+				"<code>./env/bin/pip install -e \"apps/transport[fines]\"</code><br>"
 				"<code>./env/bin/playwright install chromium</code>"
-			)
+			),
+			title=frappe._("Playwright Not Installed"),
 		)
 	return sync_playwright
+
+
+def launch_chromium(playwright, headless=True):
+	"""Start Chromium, or say which install step is missing.
+
+	Installing the Python package gets you neither the browser binary nor the
+	system libraries it links against, so a correctly-installed bench still
+	lands here - it is a normal state, not a broken one. Playwright says so in a
+	boxed banner drawn for a terminal, which reaches the desk as one unreadable
+	line, so it is worth restating in the two commands that fix it.
+	"""
+	try:
+		return playwright.chromium.launch(headless=headless)
+	except Exception as exc:
+		detail = str(exc)
+		if "Executable doesn't exist" not in detail and "playwright install" not in detail:
+			raise
+		frappe.throw(
+			frappe._(
+				"Playwright is installed but its Chromium browser is not. Add it with:<br>"
+				"<code>./env/bin/playwright install chromium</code><br>"
+				"On a server the system libraries it needs are a separate step:<br>"
+				"<code>sudo ./env/bin/playwright install-deps chromium</code>"
+			),
+			title=frappe._("Browser Not Installed"),
+		)
 
 
 class BrowserFetcher(FineFetcher):
@@ -66,7 +103,7 @@ class BrowserFetcher(FineFetcher):
 
 		sync_playwright = get_playwright()
 		self._pw = sync_playwright().start()
-		self._browser = self._pw.chromium.launch(headless=self.headless)
+		self._browser = launch_chromium(self._pw, headless=self.headless)
 		context = self._browser.new_context()
 		self._page = context.new_page()
 		self._page.set_default_timeout(self.timeout_ms)

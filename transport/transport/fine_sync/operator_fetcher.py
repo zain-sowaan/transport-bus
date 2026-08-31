@@ -96,11 +96,11 @@ class OperatorAssistedFetcher(BrowserFetcher):
 		if self._page:
 			return self._page
 
-		from transport.transport.fine_sync.browser_fetcher import get_playwright
+		from transport.transport.fine_sync.browser_fetcher import get_playwright, launch_chromium
 
 		sync_playwright = get_playwright()
 		self._pw = sync_playwright().start()
-		self._browser = self._pw.chromium.launch(headless=self.headless)
+		self._browser = launch_chromium(self._pw, headless=self.headless)
 
 		saved = self.session_path()
 		options = {"viewport": {"width": 1500, "height": 950}}

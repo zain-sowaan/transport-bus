@@ -11,6 +11,22 @@ dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
 ]
 
+# The traffic-fine fetchers drive a real browser. Deliberately NOT a base
+# dependency: most sites installing this app never fetch fines, and the browser
+# belongs in a sidecar rather than in the ERP runtime. Declaring it as an extra
+# still pins the version and makes the install a named step:
+#
+#     ./env/bin/pip install -e "apps/transport[fines]"
+#     ./env/bin/playwright install chromium
+#
+# The second command is not packaging - Chromium is a browser binary Playwright
+# downloads, not a Python distribution - so it can never be listed here.
+# Developed and tested against playwright 1.62.
+[project.optional-dependencies]
+fines = [
+    "playwright>=1.40,<2",
+]
+
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
@@ -20,6 +36,12 @@ build-backend = "flit_core.buildapi"
 # package_name = "~=1.1.0"
 
 # These apt dependencies will be installed from Ubuntu repositories when you host your app on Frappe Cloud
+#
+# Left empty on purpose. The only apt packages this app needs are the shared
+# libraries and fonts Chromium links against, and that set differs by Ubuntu
+# release - pinning a guessed list here would rot silently and be wrong on the
+# next LTS. `sudo ./env/bin/playwright install-deps chromium` resolves it for
+# the distro it is actually running on, which is the supported way to do it.
 [deploy.dependencies.apt]
 packages = []
 
