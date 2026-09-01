@@ -260,7 +260,7 @@ class TammFetcher(OperatorAssistedFetcher):
 				except Exception:
 					pass
 
-			page.wait_for_timeout(self.poll_interval_ms)
+			self.poll_wait(page)
 			waited += self.poll_interval_ms
 
 		raise AuthenticationRequired(
@@ -279,7 +279,7 @@ class TammFetcher(OperatorAssistedFetcher):
 		while waited < self.unattended_grace_ms:
 			if self._table_present(page):
 				return True
-			page.wait_for_timeout(self.poll_interval_ms)
+			self.poll_wait(page)
 			waited += self.poll_interval_ms
 		return False
 

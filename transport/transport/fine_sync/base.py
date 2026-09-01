@@ -36,6 +36,18 @@ class AuthenticationRequired(FineFetchError):
 	"""The portal needs an interactive login we cannot complete unattended."""
 
 
+class SignInWindowClosed(FineFetchError):
+	"""The sign-in window was closed before anyone finished signing in.
+
+	Its own class because it is the one failure here that is nobody's fault and
+	needs no diagnosis - somebody shut a window. Playwright reports it as
+	TargetClosedError from whatever call happened to be in flight, which reached
+	the operator as a forty-line traceback about `Page.wait_for_timeout`. That
+	is what a demo failure looked like on 2026-09-01: twice, identically, with
+	nothing on screen to suggest the remedy was "press the button again".
+	"""
+
+
 @dataclass
 class FetchedFine:
 	"""One fine exactly as the portal reported it."""

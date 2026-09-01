@@ -315,7 +315,7 @@ class MoiFetcher(OperatorAssistedFetcher):
 					return True
 			except Exception:
 				pass
-			page.wait_for_timeout(self.poll_interval_ms)
+			self.poll_wait(page)
 			waited += self.poll_interval_ms
 		return False
 
@@ -454,7 +454,7 @@ class MoiFetcher(OperatorAssistedFetcher):
 						self.save_session()
 						banked = True
 
-				page.wait_for_timeout(self.poll_interval_ms)
+				self.poll_wait(page)
 				waited += self.poll_interval_ms
 		except Exception as e:
 			# The window closing is the normal ending, and it arrives here.

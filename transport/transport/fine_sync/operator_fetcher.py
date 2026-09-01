@@ -25,6 +25,7 @@ import os
 
 import frappe
 
+from transport.transport.fine_sync.base import SignInWindowClosed
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
 
 # While the browser sits on any of these, it is mid-authentication and must be
@@ -148,6 +149,45 @@ class OperatorAssistedFetcher(BrowserFetcher):
 		self._page = self._context = self._browser = self._pw = None
 
 	# -- login -------------------------------------------------------------
+	def poll_wait(self, page, milliseconds=None):
+		"""Sleep between login polls, and name it when the window disappears.
+
+		Every operator-assisted wait sits in a poll loop for up to 45 minutes,
+		so a closed window almost always surfaces here first. Playwright raises
+		TargetClosedError from whichever call was in flight, and untranslated
+		that reached the operator as a traceback ending in
+		`Page.wait_for_timeout` - which says nothing about a window having been
+		shut, and nothing about what to do next.
+
+		Use this instead of `page.wait_for_timeout` anywhere a person is being
+		waited on.
+		"""
+		try:
+			page.wait_for_timeout(milliseconds or self.poll_interval_ms)
+		except Exception as exc:
+			if not self._window_gone(exc):
+				raise
+			raise SignInWindowClosed(
+				"The sign-in window was closed before the sign-in finished, so nothing "
+				"was fetched. Press Fetch Fines Now to open a fresh one - it waits up to "
+				"45 minutes, and it looks idle the whole time it is waiting."
+			) from exc
+
+	@staticmethod
+	def _window_gone(exc):
+		"""True when Playwright is telling us the browser is simply not there.
+
+		Matched on the message rather than the class so this holds if Playwright
+		reorganises its exception hierarchy - the strings have been stable far
+		longer than the module paths.
+		"""
+		detail = str(exc)
+		return (
+			"Target page, context or browser has been closed" in detail
+			or "TargetClosedError" in type(exc).__name__
+			or "Browser closed" in detail
+		)
+
 	def _on_auth_page(self, page):
 		"""True while the browser is on a sign-in host we must not interrupt."""
 		url = (page.url or "").lower()
