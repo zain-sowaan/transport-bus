@@ -11,8 +11,34 @@ backend request has been captured yet - today every portal needs a browser,
 but any of them may become a direct HTTP call once its contract is known.
 """
 
+import hashlib
+import re
 import time
 from dataclasses import dataclass, field
+
+
+def safe_slug(name, prefix="", length=40):
+	"""A filesystem-safe, collision-free token for a portal name.
+
+	Here rather than beside either caller because the same defect has now been
+	found twice, in two unrelated places, from the same cause: portal names
+	contain slashes ("Abu Dhabi Police / TAMM" is a real one), and anything that
+	turns a name into a path silently gets a nested directory instead of a file.
+	It cost a lock that excluded nothing, and then a capture directory that
+	scattered its frames one level down.
+
+	`frappe.scrub` is not a substitute - it lowercases and swaps spaces for
+	underscores but passes slashes straight through, which is exactly how the
+	second one happened.
+
+	The digest is the part that matters, not the tidiness: slugging alone maps
+	"A / B" and "A - B" onto one token, and two portals sharing a name is the
+	same defect wearing the opposite sign.
+	"""
+	name = str(name or "")
+	slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")[:length] or "portal"
+	digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
+	return f"{prefix}{slug}_{digest}"
 
 
 class FineFetchError(Exception):

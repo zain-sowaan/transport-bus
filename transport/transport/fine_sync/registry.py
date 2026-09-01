@@ -33,11 +33,23 @@ FETCHERS_BY_KEY = {
 }
 
 
+def fetcher_class_for(portal):
+	"""The fetcher class serving a portal, or None. Instantiates nothing.
+
+	Split out because callers increasingly want to ask what a portal *can* do -
+	whether its sign-in is relayable, say - before committing to opening a
+	browser. Doing that by constructing a fetcher meant the lookup was written
+	out three times and could disagree with itself.
+	"""
+	return (
+		FETCHERS_BY_KEY.get((portal.get("fetcher_key") or "").strip().lower())
+		or FETCHERS_BY_ROUTE.get(portal.access_route)
+	)
+
+
 def get_fetcher(portal, credential=None):
 	"""Instantiate the fetcher for a portal, or explain why there isn't one."""
-	fetcher_class = FETCHERS_BY_KEY.get((portal.get("fetcher_key") or "").strip().lower())
-	if not fetcher_class:
-		fetcher_class = FETCHERS_BY_ROUTE.get(portal.access_route)
+	fetcher_class = fetcher_class_for(portal)
 	if not fetcher_class:
 		frappe.throw(
 			_("No fetcher is implemented for {0} ({1} route). "
@@ -49,7 +61,4 @@ def get_fetcher(portal, credential=None):
 
 
 def is_supported(portal):
-	return bool(
-		FETCHERS_BY_KEY.get((portal.get("fetcher_key") or "").strip().lower())
-		or FETCHERS_BY_ROUTE.get(portal.access_route)
-	)
+	return bool(fetcher_class_for(portal))

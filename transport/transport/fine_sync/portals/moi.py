@@ -202,6 +202,14 @@ class MoiFetcher(OperatorAssistedFetcher):
 
 	session_filename = "moi.json"
 
+	# Never relayable, and this is not a gap to fill later. The relay removes
+	# the *window*, which only helps where the sole thing a person is needed for
+	# is the sign-in. MOI puts a reCAPTCHA on the **search form**, so a person is
+	# needed on every query, not once at the start. Switching a global relay
+	# setting on without this stated here would leave MOI opening a headless
+	# browser and waiting on a challenge nobody can see or answer.
+	supports_relay = False
+
 	# Captured 2026-08-30. MOI issues this with no expiry - a true session
 	# cookie - so session_status() reports "unknown" rather than a countdown:
 	# whether it still works is something only the portal can answer. That is

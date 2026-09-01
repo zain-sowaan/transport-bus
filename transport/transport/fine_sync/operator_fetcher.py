@@ -27,6 +27,19 @@ import frappe
 
 from transport.transport.fine_sync.base import SignInWindowClosed
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
+from transport.transport.fine_sync.uae_pass import (
+	LoginFrameRecorder,
+	captcha_challenge_visible,
+	on_uae_pass,
+	page_has_captcha,
+	page_is_blocked,
+	read_frame,
+)
+
+HEADLESS_USER_AGENT = (
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+	"Chrome/131.0.0.0 Safari/537.36"
+)
 
 # While the browser sits on any of these, it is mid-authentication and must be
 # left completely alone - navigating would abandon a half-finished sign-in.
@@ -64,9 +77,56 @@ class OperatorAssistedFetcher(BrowserFetcher):
 	# Subclasses name the file their session is banked in.
 	session_filename = None
 
+	# Whether this portal's sign-in can be relayed - the number typed headlessly
+	# and the confirmation shown to the operator to approve on their phone.
+	# False by default and stated per portal, because a portal that challenges
+	# on the *search* rather than only at sign-in can never be relayed, and a
+	# global switch would silently hang it waiting for a window nobody can see.
+	supports_relay = False
+
+	# Set by the caller when a person pressed a button and is watching a screen.
+	# `relay_announce` receives one dict per poll and is responsible for getting
+	# it in front of them.
+	use_relay = False
+	relay_announce = None
+
+	# Minutes, not the forty-five the windowed path allows. Nobody is being
+	# waited on to walk to a machine - the operator is already looking at the
+	# screen, and the UAE Pass push expires well inside this.
+	relay_timeout_ms = 300000
+
+	# Whether start() restores the banked sign-in. The reach probe turns this
+	# off: it is asking whether the sign-in FORM is reachable, so a live session
+	# is irrelevant to its answer and actively harmful to have. Two browsers on
+	# one TAMM session is what the portal answers by invalidating it, costing
+	# the operator a fresh UAE Pass push - which is the exact defect the portal
+	# lock exists to prevent, and a probe restoring the session would have
+	# reintroduced it through a path that never takes that lock. With a live
+	# session TAMM could also short-circuit the sign-in hop entirely, and the
+	# probe would then report "did not reach UAE Pass" for a healthy setup.
+	use_saved_session = True
+
 	def __init__(self, portal, credential=None):
 		super().__init__(portal, credential)
 		self._context = None
+		self._recorder = None
+
+	# -- capture -----------------------------------------------------------
+	def recorder(self):
+		"""The sign-in screen recorder, made on first use.
+
+		Every selector written for the UAE Pass *confirmation* screen is an
+		inference, because that screen only renders after a real push and has
+		never been recorded. This is how that stops being true, at the cost of
+		a JSON file per distinct screen during a sign-in that was happening
+		anyway. Made lazily so a run that never reaches a login writes nothing.
+		"""
+		if self._recorder is None:
+			self._recorder = LoginFrameRecorder(self.portal.name)
+		return self._recorder
+
+	def record_login_frame(self, page, note=None):
+		self.recorder().record(page, note=note)
 
 	# -- session -----------------------------------------------------------
 	def session_path(self):
@@ -103,10 +163,18 @@ class OperatorAssistedFetcher(BrowserFetcher):
 		self._pw = sync_playwright().start()
 		self._browser = launch_chromium(self._pw, headless=self.headless)
 
-		saved = self.session_path()
+		saved = self.session_path() if self.use_saved_session else None
 		options = {"viewport": {"width": 1500, "height": 950}}
 		if saved and os.path.exists(saved):
 			options["storage_state"] = saved
+		if self.headless:
+			# Playwright's default headless user agent contains the literal
+			# string "HeadlessChrome", which is the first thing a WAF filters
+			# on. Stating an ordinary one is not evasion of a challenge - no
+			# challenge is being answered here, and a CAPTCHA still stops the
+			# run outright. It is so that a portal the operator is entitled to
+			# use serves the same page it serves their own browser.
+			options["user_agent"] = HEADLESS_USER_AGENT
 
 		# Kept on the instance because save_session() has nothing to persist
 		# without it - and would return quietly rather than say so.
@@ -192,3 +260,85 @@ class OperatorAssistedFetcher(BrowserFetcher):
 		"""True while the browser is on a sign-in host we must not interrupt."""
 		url = (page.url or "").lower()
 		return any(marker in url for marker in AUTH_URL_MARKERS)
+
+	# -- relay -------------------------------------------------------------
+	def announce(self, payload):
+		"""Push one progress update towards whoever is watching. Never fatal."""
+		if not self.relay_announce:
+			return
+		try:
+			self.relay_announce(payload)
+		except Exception:
+			# Losing a progress message must not fail a sign-in that is working.
+			pass
+
+	def relay_entry_url(self, traffic_file_number=None):
+		"""The URL that starts the sign-in without a human clicking through.
+
+		Subclasses that support the relay must override this. The default
+		refuses rather than guessing, because guessing here means a headless
+		browser wandering a portal's SPA looking for a button.
+		"""
+		raise NotImplementedError
+
+	def probe_headless_reach(self, traffic_file_number=None):
+		"""Find out whether headless can even reach the sign-in form. Types nothing.
+
+		This exists because the relay rests on an assumption that had never been
+		tested: that a headless Chromium gets the same page a windowed one does.
+		Government portals sit behind WAFs, this one has already served a block
+		page for a mistaken URL shape, and a headless browser is the classic
+		thing such a filter turns away. Finding that out during a demo is how
+		this went wrong once already.
+
+		Deliberately stops before the form is filled. It needs no operator, no
+		push and no phone, so it can be run any time - which is the point.
+		"""
+		self.headless = True
+		# Never on the operator's banked session - see use_saved_session.
+		self.use_saved_session = False
+		page = self.start()
+		try:
+			page.set_default_navigation_timeout(120000)
+			page.goto(self.relay_entry_url(traffic_file_number), wait_until="domcontentloaded")
+			self._settle(page)
+			self.record_login_frame(page, note="headless-reach-probe")
+
+			frame = read_frame(page)
+			body = frame.get("body") or ""
+			html = ""
+			try:
+				html = page.content() or ""
+			except Exception:
+				pass
+
+			reached = on_uae_pass(page)
+			field = None
+			if reached:
+				from transport.transport.fine_sync.uae_pass import IDENTIFIER_JS
+
+				try:
+					# Marks the field with an attribute and reports it. Nothing is
+					# typed - this is the probe, and it stops here by design.
+					field = page.evaluate(IDENTIFIER_JS)
+				except Exception:
+					field = None
+
+			return {
+				"probed_with_saved_session": False,
+				"reached_uae_pass": reached,
+				"final_host": frame.get("url", "").split("/")[2] if "//" in frame.get("url", "") else None,
+				"blocked": page_is_blocked(body),
+				# Reported as two separate readings because they mean opposite
+				# things for whether the relay can run. UAE Pass loads invisible
+				# reCAPTCHA on every sign-in - script present, nothing asked -
+				# and treating that as a challenge stops a run that was fine.
+				"captcha_script_present": page_has_captcha(html),
+				"captcha_challenge_on_screen": captcha_challenge_visible(page),
+				"identifier_field": field,
+				"title": frame.get("title"),
+				"capture_dir": self.recorder().directory,
+				"frames": self.recorder().count,
+			}
+		finally:
+			self.close()

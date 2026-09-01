@@ -43,6 +43,9 @@
   "column_break_fine_sync",
   "imported_fine_responsibility",
   "uae_pass_mobile",
+  "fine_sync_login_mode",
+  "relay_wait_minutes",
+  "use_relay_for_scheduled_sync",
   "sweep_status_section",
   "last_operator_sweep_on",
   "last_operator_sweep_note"
@@ -320,6 +323,31 @@
    "label": "UAE Pass Mobile Number"
   },
   {
+   "default": "Operator Signs In At The Server",
+   "description": "How the UAE Pass sign-in is completed when you press Fetch Fines Now.<br><b>Operator Signs In At The Server</b> opens a real browser window on the server's own screen. It only helps someone sitting at that machine, but every step is visible and a CAPTCHA can be answered.<br><b>Relay Code To My Screen</b> runs the browser headlessly, enters the mobile number above, and shows you the sign-in screen so you can confirm the request in the UAE Pass app on your phone. Works from anywhere; cannot answer a CAPTCHA, and falls back to nothing if one appears.",
+   "fieldname": "fine_sync_login_mode",
+   "fieldtype": "Select",
+   "label": "UAE Pass Sign-In Mode",
+   "options": "Operator Signs In At The Server\nRelay Code To My Screen"
+  },
+  {
+   "default": "5",
+   "depends_on": "eval:doc.fine_sync_login_mode == 'Relay Code To My Screen'",
+   "description": "How long the relay waits for you to confirm on your phone before giving up. Minutes, not the forty-five the window allows: the UAE Pass push expires on its own, and a worker parked for three quarters of an hour helps nobody.",
+   "fieldname": "relay_wait_minutes",
+   "fieldtype": "Int",
+   "label": "Relay Wait (Minutes)",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.fine_sync_login_mode == 'Relay Code To My Screen'",
+   "description": "Off by default, and think before switching it on. A scheduled run has nobody watching, so the confirmation code is published to an empty room and the UAE Pass push is spent for nothing. Left off, scheduled runs use the session banked by the last sign-in and simply report when it has lapsed.",
+   "fieldname": "use_relay_for_scheduled_sync",
+   "fieldtype": "Check",
+   "label": "Let Scheduled Syncs Start a Relay Sign-In"
+  },
+  {
    "fieldname": "sweep_status_section",
    "fieldtype": "Section Break",
    "label": "Last Automatic Fetch"
@@ -343,7 +371,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-30 15:05:00.000000",
+ "modified": "2026-09-01 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Settings",

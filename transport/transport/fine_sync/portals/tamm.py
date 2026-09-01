@@ -26,6 +26,7 @@ entry point here is `fetch_for_traffic_file` rather than a per-plate lookup.
 """
 
 import re
+from urllib.parse import quote
 
 from transport.transport.fine_sync.base import (
 	AuthenticationRequired,
@@ -33,8 +34,25 @@ from transport.transport.fine_sync.base import (
 	FetchResult,
 )
 from transport.transport.fine_sync.operator_fetcher import OperatorAssistedFetcher
+from transport.transport.fine_sync.uae_pass import RelayNotPossible, on_uae_pass, relay_sign_in
 
 FINES_URL = "https://www.tamm.abudhabi/wb/adp/pay-traffic-fines/companies?lang=en&companyTcf={tcf}"
+
+# TAMM's own "sign in with UAE Pass" link, which hands straight off to the
+# identity provider instead of waiting on the SPA to render a button - roughly
+# twenty-five seconds saved, and no button-hunting in a page we cannot see.
+#
+# `redirectUrl` is percent-encoded. It carries a URL with its own query string,
+# so passing it raw puts a second unescaped `?` inside a parameter value; TAMM
+# then reads the deep link as truncated and drops `companyTcf`, which is the
+# only thing naming the traffic file to open.
+#
+# The `/en/` locale prefix is deliberately absent from all of these: it serves a
+# WAF block page rather than the portal.
+SMARTPASS_LOGIN = (
+	"https://www.tamm.abudhabi/services/mobility/adp/api/smartpass/login"
+	"?provider=uaepass&redirectUrl={redirect}"
+)
 
 # The fines table is the one carrying this header; matching on it rather than on
 # a generated class name keeps the parse working when the markup is re-themed.
@@ -159,6 +177,11 @@ class TammFetcher(OperatorAssistedFetcher):
 	# pager that would otherwise cycle.
 	max_pages = 25
 
+	# TAMM challenges at sign-in only; once a session exists the fines page is
+	# read without anyone answering anything. That is what makes the relay
+	# possible here and impossible on MOI, which challenges on every search.
+	supports_relay = True
+
 	def fetch_for_vehicle(self, plate_parts):
 		raise NotImplementedError(
 			"TAMM is queried per company traffic file, not per plate - one sign-in "
@@ -193,7 +216,9 @@ class TammFetcher(OperatorAssistedFetcher):
 		page.goto(FINES_URL.format(tcf=traffic_file_number), wait_until="domcontentloaded")
 		self._settle(page)
 
-		if wait_for_login:
+		if self.use_relay:
+			self._relay_login(page, traffic_file_number)
+		elif wait_for_login:
 			self._await_operator_login(page, traffic_file_number)
 		elif not self._await_table(page):
 			raise AuthenticationRequired(
@@ -224,6 +249,59 @@ class TammFetcher(OperatorAssistedFetcher):
 		return FetchResult(fines=fines, message=message, truncated=truncated)
 
 	# -- login -------------------------------------------------------------
+	def relay_entry_url(self, traffic_file_number=None):
+		"""The one-hop link that lands on UAE Pass with the deep link preserved."""
+		destination = FINES_URL.format(tcf=traffic_file_number or "")
+		return SMARTPASS_LOGIN.format(redirect=quote(destination, safe=""))
+
+	def _relay_login(self, page, traffic_file_number):
+		"""Sign in headlessly, with the confirmation shown to the operator.
+
+		The banked session is tried first and costs nothing when it is alive -
+		a relay that pushed a fresh notification to somebody's phone every run,
+		while a perfectly good session sat in the file, would be its own reason
+		to stop using this.
+
+		After the confirmation the browser is wherever TAMM's redirect left it,
+		which is its dashboard rather than the deep link, so the fines URL is
+		re-issued once. That is a navigation *after* the sign-in completed, not
+		during it - the thing the windowed path must never do mid-flow.
+		"""
+		if self._table_present(page):
+			self.announce({"stage": "signed-in", "message": "Already signed in. Reading fines."})
+			return
+
+		self.announce({"stage": "opening", "message": "Opening UAE Pass..."})
+		page.goto(self.relay_entry_url(traffic_file_number), wait_until="domcontentloaded")
+		self._settle(page)
+
+		if not on_uae_pass(page):
+			self.record_login_frame(page, note="relay-did-not-reach-uae-pass")
+			raise RelayNotPossible(
+				"TAMM did not hand off to UAE Pass, so nothing was typed and nothing was "
+				"fetched. The page it stopped on has been recorded under "
+				"private/portal-captures. Run Test Headless Reach to see it without "
+				"starting a sign-in."
+			)
+
+		relay_sign_in(
+			page,
+			self.announce,
+			recorder=self.recorder(),
+			timeout_ms=self.relay_timeout_ms,
+			poll_ms=self.poll_interval_ms,
+		)
+
+		page.goto(FINES_URL.format(tcf=traffic_file_number), wait_until="domcontentloaded")
+		self._settle(page)
+		if not self._await_table(page):
+			raise AuthenticationRequired(
+				"UAE Pass was confirmed, but the fines page never showed a table. The "
+				"sign-in worked; the fetch did not. Nothing was collected."
+			)
+		# Bank it the instant it works, so no later failure costs another push.
+		self.save_session()
+
 	def _await_operator_login(self, page, traffic_file_number):
 		"""Block until the fines table is on screen, or give up saying why.
 
@@ -242,6 +320,11 @@ class TammFetcher(OperatorAssistedFetcher):
 				# can cost the operator another UAE Pass push.
 				self.save_session()
 				return
+
+			# The windowed sign-in is the one that reaches the UAE Pass
+			# confirmation screen today, so it is the one that can record it.
+			# Every selector written for that screen is otherwise a guess.
+			self.record_login_frame(page, note="operator-sign-in")
 
 			since_nav += self.poll_interval_ms
 			if since_nav >= self.renavigate_after_ms and not self._on_auth_page(page):

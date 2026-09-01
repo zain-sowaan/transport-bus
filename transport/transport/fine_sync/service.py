@@ -14,10 +14,8 @@ Two rules shape everything here:
    would blacklist them retroactively for fines settled long ago.
 """
 
-import hashlib
 import json
 import os
-import re
 import time
 from datetime import datetime, timezone
 
@@ -25,9 +23,9 @@ import frappe
 from frappe import _
 from frappe.utils import format_datetime, format_duration, now_datetime
 
-from transport.transport.fine_sync.base import AuthenticationRequired, FineFetchError
+from transport.transport.fine_sync.base import AuthenticationRequired, FineFetchError, safe_slug
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
-from transport.transport.fine_sync.registry import get_fetcher, is_supported
+from transport.transport.fine_sync.registry import fetcher_class_for, get_fetcher, is_supported
 from transport.transport.vehicle_plate import PLATE_FIELDS
 
 SYNC_ROLES = ("Transport Accounts", "Transport Operations", "System Manager")
@@ -392,14 +390,72 @@ def portal_lock_key(portal):
 	and never deletes it - so its presence and its mtime say nothing about
 	whether a run is alive. The process holding it is the only signal.
 	"""
-	name = str(portal or "")
-	slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")[:40] or "portal"
-	digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
-	return f"fine_sync_{slug}_{digest}"
+	return safe_slug(portal, prefix="fine_sync_")
+
+
+RELAY_EVENT = "transport_fine_relay"
+
+
+def _setting(fieldname, default=None):
+	"""Read a Transport Settings field, tolerating one the site does not have yet.
+
+	`get_single_value` **throws** on an unknown fieldname rather than returning
+	None. That turns "this site has newer code than its database" into an
+	exception in every caller - including the status call the portal form makes
+	on refresh, which would leave the form with no buttons and a traceback in
+	place of its banner.
+
+	Not a hypothetical ordering problem: a UAT site running this app had none of
+	its 59 Custom Fields, because fixture import abandons a whole file when one
+	DocType in it is missing and says so only on stdout. Code that reads a
+	recently-added field should assume it might not be there.
+	"""
+	if not frappe.get_meta("Transport Settings").get_field(fieldname):
+		return default
+	return frappe.db.get_single_value("Transport Settings", fieldname)
+
+
+def _relay_timeout_ms():
+	minutes = _setting("relay_wait_minutes") or 5
+	# Bounded at both ends. Under a minute never survives a push round trip; a
+	# quarter of an hour is already far past the point the push itself expires,
+	# and beyond it a worker is just parked.
+	return int(min(max(int(minutes), 1), 15)) * 60000
+
+
+def _relay_announcer(run_name, portal_name, user):
+	"""Build the callback that puts the sign-in screen in front of a person.
+
+	Realtime rather than a field on a document, and re-sent on every poll rather
+	than once, because the confirmation screen is live-only by design: it is
+	published as a picture and never written to disk. Re-sending is what lets
+	somebody who reloaded their browser get the current screen back within a few
+	seconds instead of losing the code with no way to ask for it again.
+
+	Addressed to the one user who started the run. The screenshot can carry the
+	registered mobile number as rendered pixels, so it goes to them and to
+	nobody else - not to a role, and not to a document room any System Manager
+	could join.
+	"""
+	user = user or frappe.session.user
+
+	def announce(payload):
+		message = dict(payload)
+		message["run"] = run_name
+		message["portal"] = portal_name
+		frappe.publish_realtime(RELAY_EVENT, message, user=user)
+
+	return announce
 
 
 def run_operator_assisted_sync(
-	portal, traffic_file_number, include_details=0, wait_for_login=1, skip_if_busy=0
+	portal,
+	traffic_file_number,
+	include_details=0,
+	wait_for_login=1,
+	skip_if_busy=0,
+	use_relay=0,
+	notify_user=None,
 ):
 	"""Fetch a whole company traffic file, one run at a time.
 
@@ -422,7 +478,12 @@ def run_operator_assisted_sync(
 	try:
 		with filelock(portal_lock_key(portal), timeout=1):
 			return _operator_assisted_sync(
-				portal, traffic_file_number, include_details, wait_for_login
+				portal,
+				traffic_file_number,
+				include_details,
+				wait_for_login,
+				use_relay=use_relay,
+				notify_user=notify_user,
 			)
 	except LockTimeoutError:
 		if int(skip_if_busy or 0):
@@ -434,7 +495,9 @@ def run_operator_assisted_sync(
 		)
 
 
-def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait_for_login=1):
+def _operator_assisted_sync(
+	portal, traffic_file_number, include_details=0, wait_for_login=1, use_relay=0, notify_user=None
+):
 	"""The fetch itself. Always reached through run_operator_assisted_sync's lock.
 
 	Deliberately NOT routed through `get_syncable_portals()`. That gate exists to
@@ -480,7 +543,26 @@ def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait
 		# meant for reading fines.
 		fetcher.time_budget_seconds = _sweep_budget_seconds()
 		attended = bool(int(wait_for_login))
-		if not attended:
+		relaying = bool(int(use_relay or 0))
+		if relaying:
+			if not getattr(fetcher, "supports_relay", False):
+				# Checked again here, not only at the button, because the
+				# scheduled path reaches this function too. A portal that
+				# challenges on every search cannot be relayed at all, and
+				# failing loudly beats a headless browser waiting on a
+				# challenge nobody can see.
+				raise AuthenticationRequired(
+					f"{portal_doc.name} cannot be signed into by relay - it challenges on "
+					"the search itself, not only at sign-in, so a person has to be at the "
+					"window. Use the 'Operator signs in at the server' mode for it."
+				)
+			# Headless is the whole point: the browser runs on the server and
+			# the operator confirms on their phone, wherever they are.
+			fetcher.headless = True
+			fetcher.use_relay = True
+			fetcher.relay_announce = _relay_announcer(run.name, portal_doc.name, notify_user)
+			fetcher.relay_timeout_ms = _relay_timeout_ms()
+		elif not attended:
 			# Nobody is watching, so there is nothing for a visible window to
 			# show - and a scheduler worker has no display to open one on.
 			fetcher.headless = True
@@ -532,13 +614,25 @@ def _operator_assisted_sync(portal, traffic_file_number, include_details=0, wait
 		run.finalize(error_log=error_log)
 		_checkpoint()
 
-	return {
+	outcome = {
 		"sync_run": run.name,
 		"status": run.status,
 		"fines_found": run.fines_found,
 		"fines_new": run.fines_new,
 		"reason": reason,
 	}
+	if bool(int(use_relay or 0)):
+		# The relay's dialog is watching a stream of progress messages, so the
+		# ending has to arrive the same way. Without this it sits on the last
+		# "waiting for confirmation" frame forever, which reads as a hang even
+		# when the run finished perfectly.
+		announcer = _relay_announcer(run.name, portal, notify_user)
+		announcer({
+			"stage": "finished",
+			"message": reason or _("Finished."),
+			"outcome": outcome,
+		})
+	return outcome
 
 
 @frappe.whitelist()
@@ -564,6 +658,17 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 			title=_("Traffic File Number Missing"),
 		)
 
+	relaying = relay_is_available(portal)["available"]
+	if relaying:
+		# Read now rather than inside the job, so a missing or malformed number
+		# is a message on the button instead of a Failed run five minutes later.
+		# The value is discarded immediately - it is never carried as a job
+		# argument, because RQ keeps those in Redis and Frappe renders them in
+		# the RQ Job list.
+		from transport.transport.fine_sync.uae_pass import get_relay_mobile
+
+		get_relay_mobile()
+
 	frappe.enqueue(
 		"transport.transport.fine_sync.service.run_operator_assisted_sync",
 		queue="long",
@@ -572,13 +677,141 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 		traffic_file_number=traffic_file_number,
 		include_details=include_details,
 		wait_for_login=1,
+		use_relay=1 if relaying else 0,
+		notify_user=frappe.session.user,
 	)
 	return {
 		"queued": True,
 		"portal": portal,
-		"message": _("Fetch queued. A browser window will open for sign-in; watch "
-		             "Traffic Fine Sync Run for the result."),
+		"relay": relaying,
+		"event": RELAY_EVENT,
+		"message": (
+			_("Fetch queued. Keep this page open - the UAE Pass screen will appear here "
+			  "shortly, and you confirm the request in the app on your phone.")
+			if relaying
+			else _("Fetch queued. A browser window will open on the server for sign-in; "
+			       "watch Traffic Fine Sync Run for the result.")
+		),
 	}
+
+
+@frappe.whitelist()
+def relay_is_available(portal):
+	"""Whether this portal, in this configuration, can be signed into by relay.
+
+	One answer used in three places - the button, the queueing path and the job
+	itself - because they were each deciding it separately and could disagree.
+	The reason is returned alongside, since "no" is the useful case and a bare
+	False sends someone looking through settings for a switch that was never
+	the problem.
+	"""
+	from transport.transport.fine_sync.uae_pass import normalize_mobile
+
+	mode = _setting("fine_sync_login_mode")
+	if mode != "Relay Code To My Screen":
+		return {
+			"available": False,
+			"reason": _("UAE Pass Sign-In Mode is set to open a window on the server. "
+			            "Change it on Transport Settings to relay the code instead."),
+		}
+
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	fetcher_class = fetcher_class_for(portal_doc)
+	if not fetcher_class or not getattr(fetcher_class, "supports_relay", False):
+		return {
+			"available": False,
+			"reason": _("{0} challenges on the search itself, not only at sign-in, so a "
+			            "person has to be at the window. It cannot be relayed.").format(portal),
+		}
+
+	if not normalize_mobile(_setting("uae_pass_mobile")):
+		return {
+			"available": False,
+			"reason": _("No valid UAE Pass mobile number on Transport Settings. The relay "
+			            "types it into the sign-in, so it cannot start without one."),
+		}
+
+	return {"available": True, "reason": None}
+
+
+@frappe.whitelist()
+def enqueue_relay_reachability_probe(portal):
+	"""Queue the headless reach test. Types nothing, needs nobody, spends no push.
+
+	Worth its own button because the relay rests on an assumption that is cheap
+	to test and expensive to be wrong about: that a headless browser is served
+	the same sign-in page a windowed one gets. Government portals sit behind
+	WAFs, and headless Chromium is exactly what such a filter turns away. The
+	first time that mattered, it surfaced during a demo.
+	"""
+	_check_permission()
+	traffic_file_number = frappe.db.get_value(
+		"Traffic Fine Portal Credential",
+		{"portal": portal, "is_active": 1},
+		"traffic_file_number",
+	)
+	frappe.enqueue(
+		"transport.transport.fine_sync.service.run_relay_reachability_probe",
+		queue="long",
+		timeout=600,
+		portal=portal,
+		traffic_file_number=traffic_file_number,
+		notify_user=frappe.session.user,
+	)
+	return {
+		"queued": True,
+		"event": RELAY_EVENT,
+		"message": _("Reach test queued. It opens a headless browser, walks as far as the "
+		             "UAE Pass sign-in form and stops there - nothing is typed and no "
+		             "confirmation is sent to your phone."),
+	}
+
+
+def run_relay_reachability_probe(portal, traffic_file_number=None, notify_user=None):
+	"""Land on the sign-in form headlessly and report what was actually served."""
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	fetcher = get_fetcher(portal_doc)
+	announce = _relay_announcer(None, portal, notify_user)
+
+	# The probe opens a browser and waits on a slow portal. Nothing may sit in
+	# an open transaction across that.
+	_checkpoint()
+
+	try:
+		if not getattr(fetcher, "supports_relay", False):
+			raise AuthenticationRequired(
+				f"{portal} is not a relay portal, so there is nothing to reach-test."
+			)
+		report = fetcher.probe_headless_reach(traffic_file_number)
+	except Exception as exc:
+		frappe.log_error(title=f"Relay reach test failed: {portal}")
+		announce({"stage": "probe-failed", "message": _describe_fetch_failure(exc)})
+		raise
+	finally:
+		fetcher.close()
+
+	if report["reached_uae_pass"] and report["identifier_field"]:
+		message = _("Headless reached the UAE Pass sign-in form and found the field to "
+		            "type into. The relay should work from this server.")
+	elif report["reached_uae_pass"]:
+		message = _("Headless reached UAE Pass, but no sign-in field could be identified "
+		            "with confidence. Nothing would be typed. The screen was recorded so "
+		            "the field can be named exactly.")
+	elif report["captcha_challenge_on_screen"]:
+		message = _("UAE Pass put a CAPTCHA challenge on screen for the headless browser. "
+		            "Nothing here will answer one - use the window mode for this sign-in.")
+	elif report["blocked"]:
+		message = _("The portal served a block page to the headless browser rather than "
+		            "the sign-in. The relay cannot work from this server as it stands - "
+		            "use the window mode.")
+	else:
+		message = _("Headless did not reach UAE Pass. It stopped on {0}. The page was "
+		            "recorded under private/portal-captures.").format(
+			report.get("final_host") or _("an unknown page"))
+
+	report["message"] = message
+	announce({"stage": "probe-finished", "message": message, "report": report})
+	return report
 
 
 def describe_session_status(status):
@@ -745,6 +978,14 @@ def get_portal_session_status(portal):
 	# public form URL to capture.
 	status["can_run_sync"] = bool(portal_doc.is_enabled) and status["fetch_implemented"]
 	status["can_capture_public"] = bool(portal_doc.public_form_url)
+	# The button has to say which of the two sign-ins it is about to start,
+	# because they ask completely different things of the person pressing it -
+	# one needs them at the server's own screen, the other needs their phone.
+	# Guessing wrong is how somebody waits at a window that never opened.
+	relay = relay_is_available(portal_doc.name)
+	status["supports_relay"] = bool(getattr(fetcher, "supports_relay", False))
+	status["relay_available"] = relay["available"]
+	status["relay_blocked_reason"] = relay["reason"]
 
 	if not status["fetch_implemented"]:
 		# Say what is actually missing. "No live session" would be true and
@@ -1043,20 +1284,35 @@ def _sweep_one_portal(portal_name):
 
 	# Check for a banked session before opening anything at all.
 	status = portal_session_reading(fetcher, portal_doc)
+	relaying = False
 	if not status.get("usable"):
-		return _("{0}: not fetched - {1}").format(
-			portal_name,
-			status.get("message")
-			or _("this portal banks no signed-in session, so nothing can be fetched unattended."),
-		)
+		# A lapsed session normally just means no run. It can instead start a
+		# relay sign-in, but only where somebody has deliberately switched that
+		# on: a scheduled relay pushes a confirmation to a phone at whatever
+		# hour the cron fires, publishes the code to a screen nobody is
+		# watching, and spends a push that cannot be re-requested. Off by
+		# default for that reason, and the setting says so.
+		if not (
+			_setting("use_relay_for_scheduled_sync")
+			and relay_is_available(portal_name)["available"]
+		):
+			return _("{0}: not fetched - {1}").format(
+				portal_name,
+				status.get("message")
+				or _("this portal banks no signed-in session, so nothing can be fetched unattended."),
+			)
+		relaying = True
 
 	try:
 		result = run_operator_assisted_sync(
 			portal_name,
 			traffic_file_number,
 			include_details=1,
+			# A relay does its own signing in, so it must not also be told to
+			# wait at a window nobody opened.
 			wait_for_login=0,
 			skip_if_busy=1,
+			use_relay=1 if relaying else 0,
 		)
 	except Exception as exc:
 		# Only reaches here if the fetch could not be *started* - a permission
