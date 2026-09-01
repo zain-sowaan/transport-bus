@@ -314,7 +314,7 @@
    "options": "Company\nDriver\nCustomer"
   },
   {
-   "description": "Mobile number registered with UAE Pass for the company identity that signs in to TAMM and MOI. Held so a sign-in can be started without anyone retyping it. It is not a password - the approval still happens on the registered phone - but it is personal data, so it stays on the site and never reaches the app's code or fixtures.",
+   "description": "Mobile number registered with UAE Pass for the company identity that signs in to TAMM and MOI. Enter it in local 05... form - that is what the sign-in accepts in practice, despite the 971... example shown in its own placeholder. Not a password: the approval still happens on the registered phone. It is personal data, so it stays on the site and never reaches the app's code or fixtures.",
    "fieldname": "uae_pass_mobile",
    "fieldtype": "Data",
    "label": "UAE Pass Mobile Number"
