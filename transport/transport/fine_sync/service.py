@@ -14,8 +14,10 @@ Two rules shape everything here:
    would blacklist them retroactively for fines settled long ago.
 """
 
+import hashlib
 import json
 import os
+import re
 import time
 from datetime import datetime, timezone
 
@@ -367,6 +369,35 @@ def _stage_fine(run, portal_doc, vehicle, fine):
 
 
 @frappe.whitelist()
+def portal_lock_key(portal):
+	"""A filesystem-safe, collision-free lock name for one portal.
+
+	`filelock` turns its name straight into a path, so a portal name containing
+	a slash - "Abu Dhabi Police / TAMM" is a real one - quietly became a
+	*directory* `fine_sync_Abu Dhabi Police ` holding a file ` TAMM.lock`, stray
+	spaces at both ends. It did exclude correctly, but only by accident: every
+	caller happened to build the key from a byte-identical string. Anything that
+	stripped the name, or the portal being renamed with different spacing around
+	the slash, would mint a second key colliding with nothing, and the lock would
+	stop excluding anything without a word. Two browsers on one TAMM session is
+	the exact thing this lock exists to prevent, and it costs a person a UAE Pass
+	sign-in each time it happens.
+
+	The digest is what makes this safe rather than merely tidy. Slugging alone
+	maps "A / B" and "A - B" onto one key, and two portals sharing a lock is the
+	same defect wearing the opposite sign.
+
+	Note for anyone reading lock files as evidence: the `.lock` file is left
+	behind after the lock is released - the library holds an OS-level lock on it
+	and never deletes it - so its presence and its mtime say nothing about
+	whether a run is alive. The process holding it is the only signal.
+	"""
+	name = str(portal or "")
+	slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")[:40] or "portal"
+	digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
+	return f"fine_sync_{slug}_{digest}"
+
+
 def run_operator_assisted_sync(
 	portal, traffic_file_number, include_details=0, wait_for_login=1, skip_if_busy=0
 ):
@@ -389,7 +420,7 @@ def run_operator_assisted_sync(
 	_check_permission()
 
 	try:
-		with filelock(f"fine_sync_{portal}", timeout=1):
+		with filelock(portal_lock_key(portal), timeout=1):
 			return _operator_assisted_sync(
 				portal, traffic_file_number, include_details, wait_for_login
 			)
