@@ -209,8 +209,8 @@ class TammFetcher(OperatorAssistedFetcher):
 
 		`wait_for_login=False` is the unattended mode: it uses whatever session
 		was saved and gives up at once if that session is dead. A scheduled run
-		must never sit waiting for a push nobody is going to approve - at a
-		45-minute cadence that would leave hung browsers stacking up.
+		must never sit waiting for a push nobody is going to approve - on a
+		repeating schedule that would leave hung browsers stacking up.
 		"""
 		page = self.start()
 		page.goto(FINES_URL.format(tcf=traffic_file_number), wait_until="domcontentloaded")

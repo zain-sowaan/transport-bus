@@ -513,7 +513,7 @@ def run_operator_assisted_sync(
 	with it, so the lock lives here, where every caller must pass through it.
 
 	`skip_if_busy` distinguishes the two callers. A person who pressed a button
-	deserves to be told why nothing happened; a 45-minute cron finding a run
+	deserves to be told why nothing happened; an hourly cron finding a run
 	already going is ordinary, and should say so without filing an error.
 	"""
 	from frappe.utils.synchronization import LockTimeoutError, filelock
@@ -1156,7 +1156,7 @@ def portal_session_reading(fetcher, portal_doc):
 	"""The one reading of a portal's sign-in, for the form and the sweep both.
 
 	They used to answer this separately, and a sweep that trusted the cookie
-	queued a fetch every 45 minutes that the portal had already refused.
+	queued a fetch on every fire that the portal had already refused.
 	"""
 	reader = getattr(fetcher, "session_status", None)
 	status = describe_session_status(
@@ -1172,7 +1172,7 @@ def get_portal_session_status(portal):
 
 	Exists because a lapsed session is otherwise invisible on the form. The
 	scheduled entry point skips a portal with no live session on purpose - a
-	browser opened every 45 minutes to fail would bury the log in noise - so
+	browser opened every hour to fail would bury the log in noise - so
 	without this an operator has no way to know whether the automation can
 	currently do anything at all.
 
@@ -1335,6 +1335,36 @@ def run_portal_capture(portal):
 SWEEP_JOB_ID = "transport_operator_fine_sweep"
 
 
+def _operator_sweep_portals():
+	"""Portals the unattended sweep may touch. One query, used by both halves.
+
+	`is_enabled` is in here because it was missing, and its absence made the
+	obvious kill switch a lie: an operator who unticked "Enabled" on the portal
+	watched the sweep keep fetching, because neither half of this path ever
+	looked at the field. Every other route already respected it -
+	`get_syncable_portals()` filters on it - so the two had simply drifted.
+
+	Written once and called from both halves for that reason. The queueing half
+	and the sweep itself each ran their own copy of this filter, which is how
+	they came to disagree with `get_syncable_portals()` in the first place, and
+	fixing only one of them would leave a sweep already on the long worker still
+	running against a portal somebody had just switched off.
+
+	The three conditions are not interchangeable. `is_enabled` is the operator's
+	switch; `has_written_authorization` is the legal gate on touching the portal
+	at all; `fetch_mode` is whether an unattended run is even the right shape.
+	"""
+	return frappe.get_all(
+		"Traffic Fine Portal",
+		filters={
+			"is_enabled": 1,
+			"fetch_mode": "Operator Assisted",
+			"has_written_authorization": 1,
+		},
+		fields=["name"],
+	)
+
+
 def run_scheduled_operator_syncs():
 	"""The scheduled entry point. Decides whether there is anything to do, and
 	hands the doing to the long queue.
@@ -1357,14 +1387,11 @@ def run_scheduled_operator_syncs():
 		_record_sweep_note(_("Skipped: Traffic Fine Sync is switched off in Transport Settings."))
 		return
 
-	portals = frappe.get_all(
-		"Traffic Fine Portal",
-		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
-		fields=["name"],
-	)
+	portals = _operator_sweep_portals()
 	if not portals:
 		_record_sweep_note(
-			_("Nothing to do: no operator-assisted portal has its written authorization on record.")
+			_("Nothing to do: no portal is currently enabled, authorized in writing and set to "
+			  "Operator Assisted. Unticking Enabled on the portal is what stops this check.")
 		)
 		return
 
@@ -1380,7 +1407,7 @@ def run_scheduled_operator_syncs():
 	budget = _sweep_budget_seconds() or 1800
 	timeout = int(min(len(portals) * (budget + 600) + 300, 2 * budget + 900))
 
-	# Deduplicated because a fetch can outlive the 45-minute gap to the next
+	# Deduplicated because a fetch can outlive the gap to the next
 	# fire. Without this, a second sweep would start against a portal the first
 	# one is still signed in to, which is how a session gets invalidated.
 	job = frappe.enqueue(
@@ -1396,7 +1423,7 @@ def run_scheduled_operator_syncs():
 		started = frappe.db.get_single_value("Transport Settings", "last_operator_sweep_on")
 		_record_sweep_note(
 			_("A fetch started at {0} is still running, so this check queued nothing. The next "
-			  "check is in 45 minutes.").format(format_datetime(started) if started else _("an earlier check")),
+			  "check is in an hour.").format(format_datetime(started) if started else _("an earlier check")),
 			stamp=False,
 		)
 		return
@@ -1419,7 +1446,7 @@ def run_operator_sweep():
 	  syncs, which ships off.
 	* **Never waits for a login.** A sign-in needs a UAE Pass push approved on a
 	  phone. Waiting for one on a schedule would leave a browser hung until the
-	  next fire, and at a 45-minute cadence those stack up until the box dies.
+	  next fire, and on a repeating schedule those stack up until the box dies.
 	  No live session simply means no run.
 	* **Never overlaps itself.** `run_operator_assisted_sync` holds the portal
 	  lock; this passes `skip_if_busy` so a collision is reported, not filed as
@@ -1440,11 +1467,7 @@ def run_operator_sweep():
 		_record_sweep_note(_("Stopped: Traffic Fine Sync was switched off before this check ran."))
 		return
 
-	portals = frappe.get_all(
-		"Traffic Fine Portal",
-		filters={"fetch_mode": "Operator Assisted", "has_written_authorization": 1},
-		fields=["name"],
-	)
+	portals = _operator_sweep_portals()
 	notes = []
 	done = 0
 	try:
@@ -1629,7 +1652,7 @@ def _record_sweep_note(note, stamp=True):
 
 	Onto Transport Settings rather than the Error Log, because none of these
 	outcomes is an error - "nobody has signed in lately" is the normal state of
-	an operator-assisted portal - and filing them as errors every 45 minutes is
+	an operator-assisted portal - and filing them as errors every hour is
 	the noise this whole path was built to avoid. It is a status, so it lives
 	where the switch that controls it lives.
 	"""

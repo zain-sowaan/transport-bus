@@ -226,7 +226,7 @@ class MoiFetcher(OperatorAssistedFetcher):
 
 	# The search form carries its own CAPTCHA, so no banked session makes this
 	# unattended. Declared rather than discovered: without it the scheduled
-	# sweep would queue a job every 45 minutes that is guaranteed to fail, and
+	# sweep would queue a job on every fire that is guaranteed to fail, and
 	# fill the log with a failure that is really a design fact.
 	supports_unattended = False
 

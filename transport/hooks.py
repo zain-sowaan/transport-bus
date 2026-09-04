@@ -207,11 +207,23 @@ scheduler_events = {
 			"transport.transport.driver_portal.send_trip_reminders",
 			"transport.transport.driver_portal.escalate_unconfirmed_trips",
 		],
-		# Every 45 minutes: picks up new fines during the ~90 minutes a TAMM
-		# session stays alive after an operator signs in. Off unless Transport
-		# Settings enables it, and it exits immediately when no session is
-		# banked - it never waits for a login nobody is there to approve.
-		"*/45 * * * *": [
+		# Hourly, on the hour. NOT "*/45": cron has no notion of "every 45
+		# minutes" - the step applies within the 0-59 minute field, so */45
+		# fires at :00 and :45 and the real gaps alternate 45 then 15. The
+		# short leg is what turned a slow fetch into back-to-back sweeps
+		# against the portal, which is how the IP's reCAPTCHA score was burned.
+		#
+		# An hour also has to be long enough that the previous sweep is
+		# normally finished: the fetch budget alone defaults to 30 minutes.
+		# Overlap is still handled - the job is deduplicated - but a cadence
+		# that relies on the dedup for every fire is one bug away from the
+		# same incident.
+		#
+		# How long a banked TAMM session actually lasts is NOT known and is
+		# deliberately not asserted here. Portal Session Observation is
+		# accumulating the answer from runs we already make; until it has both
+		# ends, no figure belongs in a comment or in front of a client.
+		"0 * * * *": [
 			"transport.transport.fine_sync.service.run_scheduled_operator_syncs",
 		],
 	},
