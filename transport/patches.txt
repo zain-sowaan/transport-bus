@@ -18,3 +18,4 @@ transport.patches.clear_fabricated_trip_actual_times
 transport.patches.rename_staging_last_seen_on
 transport.patches.remove_duplicate_portal_client_script
 transport.patches.set_transport_settings_defaults_p10
+transport.patches.raise_relay_wait_to_ten

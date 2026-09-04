@@ -62,6 +62,7 @@ import frappe
 from transport.transport.fine_sync.base import (
 	AuthenticationRequired,
 	CaptchaEncountered,
+	ConfirmationNotApproved,
 	FineFetchError,
 	safe_slug,
 )
@@ -571,6 +572,27 @@ def relay_sign_in(page, announce, recorder=None, timeout_ms=300000, poll_ms=4000
 		if recorder:
 			recorder.record(page, note="awaiting-confirmation")
 
+		# The check at the top of this function runs before the button is
+		# clicked, and that is the wrong and only place it used to run. UAE Pass
+		# binds *invisible* reCAPTCHA to the sign-in button, so a challenge is
+		# something the click provokes - it cannot be present beforehand in the
+		# case that actually happens. Without this, a challenged sign-in spent
+		# the whole window announcing "confirm the request on your phone" at an
+		# operator looking at a picture of traffic lights, then failed with a
+		# message blaming their phone. Raise on the first challenged frame so
+		# the window is not burned and the reason is the real one.
+		if captcha_challenge_visible(page):
+			if recorder:
+				recorder.record(page, note="captcha-after-submit")
+			raise CaptchaEncountered(
+				frappe._(
+					"UAE Pass put a CAPTCHA challenge on screen after the sign-in was "
+					"submitted. Nothing here will answer one. Switch Sign-In Mode to "
+					"'Operator signs in at the server' and complete it in the window - "
+					"the challenge is answerable there, by the person in front of it."
+				)
+			)
+
 		candidates = read_match_code(page)
 		announce({
 			"stage": "awaiting-confirmation",
@@ -585,7 +607,14 @@ def relay_sign_in(page, announce, recorder=None, timeout_ms=300000, poll_ms=4000
 			"seconds_left": max(0, (timeout_ms - waited) // 1000),
 		})
 
-	raise AuthenticationRequired(
-		"UAE Pass was not confirmed in time, so nothing was fetched. The push expires on "
-		"its own - press Fetch Fines Now to start a fresh one."
+	# Not bare AuthenticationRequired: see ConfirmationNotApproved's docstring.
+	# A push nobody answered says nothing about whether the banked session is
+	# still good, and reporting it as a refusal made the portal form claim the
+	# session had been rejected when it had not been used.
+	raise ConfirmationNotApproved(
+		frappe._(
+			"UAE Pass was not confirmed within {0} minutes, so nothing was fetched. "
+			"Nothing is wrong with the saved sign-in - the push simply expires on its "
+			"own. Press Fetch Fines Now to send a fresh one."
+		).format(max(1, timeout_ms // 60000))
 	)

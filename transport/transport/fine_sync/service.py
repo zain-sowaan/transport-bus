@@ -23,7 +23,12 @@ import frappe
 from frappe import _
 from frappe.utils import format_datetime, format_duration, now_datetime
 
-from transport.transport.fine_sync.base import AuthenticationRequired, FineFetchError, safe_slug
+from transport.transport.fine_sync.base import (
+	AuthenticationRequired,
+	ConfirmationNotApproved,
+	FineFetchError,
+	safe_slug,
+)
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
 from transport.transport.fine_sync.registry import fetcher_class_for, get_fetcher, is_supported
 from transport.transport.vehicle_plate import PLATE_FIELDS
@@ -34,6 +39,35 @@ SYNC_ROLES = ("Transport Accounts", "Transport Operations", "System Manager")
 # never reaches tabSingles until the doc is saved once, so reading the setting
 # alone would give None on every site that has not opened the form.
 DEFAULT_SWEEP_BUDGET_MINUTES = 30
+
+
+def _log_error(title):
+	"""Write to Error Log without dumping every local variable into it.
+
+	`frappe.log_error(title=...)` with no `message` fills the traceback in
+	itself, and the default it reaches for is `get_traceback(with_context=True)`
+	- the `traceback_with_variables` rendering, which prints each frame's locals
+	beside the stack. Its sanitiser blanks only exact dict keys named
+	password/passwd/secret/token/key/pwd, so a plain local holding the relay
+	mobile number or the traffic file number is written out verbatim: into Error
+	Log, which any System Manager can open, and on to Sentry through
+	`capture_exception`. That is the same client data `get_relay_mobile()`
+	deliberately keeps out of RQ job kwargs, arriving by a quieter route.
+
+	Passing the plain traceback explicitly is what suppresses it. The frame
+	locals are a genuine debugging loss and this gives them up on purpose - the
+	stack still names the file, the line and the exception, and a Sync Run's own
+	`error_log` field has always carried this same plain traceback anyway.
+
+	Call only from inside an `except` block. `get_traceback()` returns "" with no
+	exception in flight, and log_error treats an empty message as "not supplied"
+	- which would quietly restore the leaky default this exists to avoid.
+	"""
+	# log_error swaps its two arguments when the title looks like a traceback,
+	# and it decides that on a newline. Titles here interpolate names that reach
+	# us from a whitelisted call, so flatten rather than trust them.
+	title = str(title).replace("\n", " ")
+	return frappe.log_error(title=title, message=frappe.get_traceback() or "No traceback available.")
 
 
 def _sweep_budget_seconds():
@@ -231,12 +265,16 @@ def run_sync(portal, limit=None, vehicles=None):
 
 	fetcher = None
 	error_log = None
+	# Read after the try/except, so they must exist even if the first line in it
+	# raises. See _record_session_observation for what is and is not recorded.
+	banked_before, failure = None, None
 	budget = _sweep_budget_seconds()
 	deadline = time.monotonic() + budget if budget else None
 	try:
 		fetcher = get_fetcher(portal_doc, credential_doc)
 		fetcher.time_budget_seconds = budget
 		fetcher.arm_deadline()
+		banked_before = _session_banked_at(fetcher)
 		for index, v in enumerate(queryable):
 			# Checked between vehicles, which is where a sweep actually spends
 			# its time: one browser page load each, so 42 vehicles can run past
@@ -257,12 +295,13 @@ def run_sync(portal, limit=None, vehicles=None):
 			# so holding every staged fine back to the end means holding the
 			# staging series lock for the whole sweep.
 			_checkpoint()
-	except Exception:
+	except Exception as exc:
 		# A failure setting up (or an unsupported portal) fails the whole run
 		# loudly rather than leaving it looking merely empty.
 		run.status = "Failed"
+		failure = exc
 		error_log = frappe.get_traceback()
-		frappe.log_error(title=f"Traffic fine sync failed: {portal_doc.name}")
+		_log_error(f"Traffic fine sync failed: {portal_doc.name}")
 	finally:
 		if fetcher:
 			fetcher.close()
@@ -272,6 +311,8 @@ def run_sync(portal, limit=None, vehicles=None):
 		_checkpoint()
 		run.finalize(error_log=error_log)
 		_checkpoint()
+
+	_record_session_observation(portal_doc.name, banked_before, failure, run.name)
 
 	return {
 		"sync_run": run.name,
@@ -416,7 +457,11 @@ def _setting(fieldname, default=None):
 
 
 def _relay_timeout_ms():
-	minutes = _setting("relay_wait_minutes") or 5
+	# Ten, matching the field's own default. It has to be repeated here rather
+	# than read from the DocType: a Single's JSON default never reaches
+	# tabSingles until the form is saved once, so on every site that has not
+	# opened Transport Settings this literal IS the default.
+	minutes = _setting("relay_wait_minutes") or 10
 	# Bounded at both ends. Under a minute never survives a push round trip; a
 	# quarter of an hour is already far past the point the push itself expires,
 	# and beyond it a worker is just parked.
@@ -536,6 +581,9 @@ def _operator_assisted_sync(
 	_checkpoint()
 
 	fetcher, error_log, staged, reason = None, None, 0, None
+	# Both read after the try/except, so they must exist even when the very
+	# first line inside it raises.
+	banked_before, failure = None, None
 	try:
 		fetcher = get_fetcher(portal_doc)
 		# The fetcher arms this itself once the sign-in is done, so an operator
@@ -566,6 +614,10 @@ def _operator_assisted_sync(
 			# Nobody is watching, so there is nothing for a visible window to
 			# show - and a scheduler worker has no display to open one on.
 			fetcher.headless = True
+		# Read before the fetch, not after: a run that signs in fresh rewrites
+		# the session file, and with it the only timestamp saying how old the
+		# session under test was.
+		banked_before = _session_banked_at(fetcher)
 		result = fetcher.fetch_for_traffic_file(
 			traffic_file_number,
 			include_details=bool(int(include_details)),
@@ -598,12 +650,13 @@ def _operator_assisted_sync(
 			reason = result.message
 	except Exception as exc:
 		run.status = "Failed"
+		failure = exc
 		error_log = frappe.get_traceback()
 		# One readable line beside the traceback, not instead of it. The sweep
 		# writes its outcome onto a settings field nobody would read a traceback
 		# out of, and the traceback still has to stay intact on the run.
 		reason = _describe_fetch_failure(exc)
-		frappe.log_error(title=f"Operator-assisted fine sync failed: {portal_doc.name}")
+		_log_error(f"Operator-assisted fine sync failed: {portal_doc.name}")
 	finally:
 		if fetcher:
 			fetcher.close()
@@ -613,6 +666,8 @@ def _operator_assisted_sync(
 		_checkpoint()
 		run.finalize(error_log=error_log)
 		_checkpoint()
+
+	_record_session_observation(portal_doc.name, banked_before, failure, run.name)
 
 	outcome = {
 		"sync_run": run.name,
@@ -692,6 +747,188 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 			else _("Fetch queued. A browser window will open on the server for sign-in; "
 			       "watch Traffic Fine Sync Run for the result.")
 		),
+	}
+
+
+def _session_banked_at(fetcher):
+	"""When the fetcher's saved sign-in was written, or None.
+
+	The file's mtime is the only record of it: `save_session()` writes the
+	whole storage state at the moment sign-in succeeds and keeps no timestamp
+	of its own inside.
+	"""
+	try:
+		path = fetcher.session_path()
+		if not path or not os.path.exists(path):
+			return None
+		return frappe.utils.convert_utc_to_system_timezone(
+			datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
+		).replace(tzinfo=None)
+	except Exception:
+		return None
+
+
+def _record_session_observation(portal, banked_at, failure, sync_run=None):
+	"""Write down how old the sign-in was when the portal ruled on it.
+
+	This is the whole session-lifetime measurement, and it costs no portal
+	traffic at all. Polling a portal until its session dies would be the
+	obvious way to find the number and is the wrong one here: every poll is
+	another automated request from the address whose reputation is already the
+	reason challenges appear. Each sync already makes the portal rule on the
+	session, so the answer is being thrown away rather than gathered.
+
+	**Only the two informative outcomes are recorded.** Silence is the correct
+	response to everything else:
+
+	- No prior session - the run signed in fresh, so nothing was tested.
+	- `ConfirmationNotApproved` - a push nobody answered. The session was never
+	  presented, and filing that as a refusal is exactly the false negative
+	  that made the portal banner claim a healthy session had been rejected.
+	- Any other failure - a timeout, a parse error, a portal outage. None of
+	  them is the portal ruling on a cookie, and a lifetime built from them
+	  would read as far shorter than the truth.
+	"""
+	if not banked_at:
+		return
+	if failure is not None and not isinstance(failure, AuthenticationRequired):
+		return
+	if isinstance(failure, ConfirmationNotApproved):
+		return
+
+	observed_on = now_datetime()
+	try:
+		frappe.get_doc({
+			"doctype": "Portal Session Observation",
+			"portal": portal,
+			"banked_on": banked_at,
+			"observed_on": observed_on,
+			"age_minutes": max(0, int((observed_on - banked_at).total_seconds() // 60)),
+			"outcome": "Refused" if failure is not None else "Accepted",
+			"sync_run": sync_run,
+		}).insert(ignore_permissions=True)
+	except Exception:
+		# A measurement must never be able to fail a sync. The run's own result
+		# is the thing that matters; a missing data point is not.
+		_log_error(f"Could not record session observation: {portal}")
+
+
+@frappe.whitelist()
+def portal_session_lifetime(portal):
+	"""What the observations say a banked sign-in is good for.
+
+	Reported as a bracket rather than a single figure, because that is what the
+	data actually supports: the longest age the portal has still accepted, and
+	the shortest age it has refused. The real expiry is somewhere between them,
+	and it narrows as more runs happen.
+
+	Written for the sentence somebody wants to put in front of a client. Until
+	both ends exist, the honest answer is that we do not know yet - which is
+	the answer this returns, rather than a number nobody measured.
+	"""
+	if not frappe.has_permission("Traffic Fine Portal", "read", doc=portal):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+	rows = frappe.get_all(
+		"Portal Session Observation",
+		filters={"portal": portal},
+		fields=["outcome", "age_minutes"],
+		limit_page_length=0,
+	)
+	accepted = [r.age_minutes for r in rows if r.outcome == "Accepted" and r.age_minutes is not None]
+	refused = [r.age_minutes for r in rows if r.outcome == "Refused" and r.age_minutes is not None]
+
+	longest_accepted = max(accepted) if accepted else None
+	shortest_refused = min(refused) if refused else None
+
+	if longest_accepted is None and shortest_refused is None:
+		message = _("No observations yet. The figure appears here on its own as fines are fetched.")
+	elif shortest_refused is None:
+		message = _("At least {0} minutes - no expiry has been observed yet, so this is a floor "
+		            "and not the lifetime.").format(longest_accepted)
+	elif longest_accepted is None:
+		message = _("Under {0} minutes on the only expiry seen so far.").format(shortest_refused)
+	elif longest_accepted < shortest_refused:
+		message = _("Between {0} and {1} minutes.").format(longest_accepted, shortest_refused)
+	else:
+		# Overlapping brackets are not bad data - a portal may end a session
+		# for its own reasons - so say so instead of picking a side.
+		message = _("Not a clean cut: accepted at {0} minutes but refused at {1}, so the portal "
+		            "is ending some sessions early for reasons other than age.").format(
+			longest_accepted, shortest_refused
+		)
+
+	return {
+		"observations": len(rows),
+		"longest_accepted_minutes": longest_accepted,
+		"shortest_refused_minutes": shortest_refused,
+		"message": message,
+	}
+
+
+@frappe.whitelist()
+def get_portal_signin_console():
+	"""Where the operator can watch and drive the server's sign-in browser.
+
+	The console is a noVNC view of the Xvfb display the headed browser runs on,
+	so an operator anywhere can answer a CAPTCHA the server cannot. That is the
+	whole point of it, and it is also exactly why this is gated three times
+	rather than once.
+
+	**What opening this actually grants.** Not a picture of a screen - a mouse
+	and a keyboard on a browser that is signed in to a government portal with a
+	banked session. Whoever holds it can navigate that browser anywhere the
+	session reaches, which on TAMM includes the payment controls. No rule in
+	this app can stop them; the only real controls are who gets the console's
+	own password and who holds a fine-sync role here.
+
+	So: off unless someone switched it on, refused without a fine-sync role, and
+	refused over plain HTTP. The address is never rendered into a page for
+	anyone who fails those - it is fetched, not embedded.
+
+	Every grant is written to the site log. There is deliberately no DocType for
+	it: an audit trail that any holder of the audited permission can edit is
+	worse than none, and Transport roles can write most things here.
+	"""
+	_check_permission()
+
+	if not _setting("enable_portal_signin_console"):
+		return {
+			"available": False,
+			"reason": _("The sign-in console is switched off. Transport Settings has the "
+			            "switch, and its description is worth reading before you use it."),
+		}
+
+	url = (_setting("portal_signin_console_url") or "").strip()
+	if not url:
+		return {
+			"available": False,
+			"reason": _("No console address is set. Put the noVNC address on Transport "
+			            "Settings first."),
+		}
+
+	# Plain HTTP would carry the console's own password, every keystroke typed
+	# into the portal, and the whole signed-in screen in clear text. Refused
+	# rather than warned about.
+	if not url.lower().startswith("https://"):
+		return {
+			"available": False,
+			"reason": _("The console address must be HTTPS. It carries a live portal "
+			            "session and its own password, and neither may cross the network "
+			            "in the clear."),
+		}
+
+	frappe.logger("transport.portal_console").info(
+		f"portal sign-in console opened by {frappe.session.user}"
+	)
+
+	return {
+		"available": True,
+		"url": url,
+		"warning": _("This is a live browser signed in to the portal, not a picture of "
+		             "one. Anything you click there really happens - never touch a pay "
+		             "or delete control. Answer the challenge, approve the push on your "
+		             "phone, then close this window."),
 	}
 
 
@@ -784,7 +1021,7 @@ def run_relay_reachability_probe(portal, traffic_file_number=None, notify_user=N
 			)
 		report = fetcher.probe_headless_reach(traffic_file_number)
 	except Exception as exc:
-		frappe.log_error(title=f"Relay reach test failed: {portal}")
+		_log_error(f"Relay reach test failed: {portal}")
 		announce({"stage": "probe-failed", "message": _describe_fetch_failure(exc)})
 		raise
 	finally:
@@ -1318,7 +1555,7 @@ def _sweep_one_portal(portal_name):
 		# Only reaches here if the fetch could not be *started* - a permission
 		# or authorization refusal. Once it starts, `_operator_assisted_sync`
 		# catches its own failures and reports them on the Sync Run.
-		frappe.log_error(title=f"Scheduled fine sweep could not start: {portal_name}")
+		_log_error(f"Scheduled fine sweep could not start: {portal_name}")
 		return _("{0}: could not start - {1}").format(portal_name, _describe_fetch_failure(exc))
 
 	return _describe_sync_result(portal_name, result)
@@ -1365,6 +1602,11 @@ def _describe_fetch_failure(exc):
 	`_apply_portal_verdict` reads the exception's name out of it.
 	"""
 	message = (str(exc) or "").strip()
+	# Before its parent, which it subclasses. A missed push already carries its
+	# own remedy ("press Fetch Fines Now"), and the parent's - go and sign in
+	# again - is the wrong instruction for a sign-in that never failed.
+	if isinstance(exc, ConfirmationNotApproved):
+		return message or _("nobody confirmed the UAE Pass push in time.")
 	if isinstance(exc, AuthenticationRequired):
 		# The exception already says what the portal did; all this adds is the
 		# remedy, because the note is read by whoever has to act on it and the
@@ -1405,7 +1647,7 @@ def _record_sweep_note(note, stamp=True):
 		frappe.db.commit()
 	except Exception:
 		# A note that cannot be written must never take the sweep down with it.
-		frappe.log_error(title="Could not record operator sweep note")
+		_log_error("Could not record operator sweep note")
 
 
 def _enrich_staging_row(name, vehicle, fine):
@@ -1581,4 +1823,4 @@ def run_scheduled_syncs():
 		try:
 			run_sync(portal.name)
 		except Exception:
-			frappe.log_error(title=f"Scheduled fine sync failed: {portal.name}")
+			_log_error(f"Scheduled fine sync failed: {portal.name}")

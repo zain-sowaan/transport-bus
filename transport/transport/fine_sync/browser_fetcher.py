@@ -27,6 +27,8 @@ drive to the portal, record the page and its form fields, and use that to
 write the real selectors. Anything else would be invented.
 """
 
+import os
+
 import frappe
 
 from transport.transport.fine_sync.base import CaptchaEncountered, FineFetcher
@@ -58,6 +60,43 @@ def get_playwright():
 	return sync_playwright
 
 
+DEFAULT_CONSOLE_DISPLAY = ":99"
+
+
+def _ensure_display():
+	"""Point a headed browser at the virtual display, in-process.
+
+	A display-less server cannot start a headed Chromium at all - it dies with
+	"Missing X server or $DISPLAY" and reaches the operator as a
+	`TargetClosedError` from whatever call was in flight. Xvfb supplies the
+	display; this supplies the pointer to it.
+
+	Done here rather than in supervisor on purpose. The obvious fix is an
+	`environment=DISPLAY=":99"` line on the worker programs, but bench *writes*
+	`config/supervisor.conf`, so `bench setup supervisor` silently reverts it
+	and the fault comes back at the next deploy looking like a new one. A
+	worker's environment is also inherited at fork, so a display added after
+	the workers started would not reach them until a restart nobody knew to do.
+
+	`setdefault`, not assignment: a real X session (a developer's own desktop,
+	or a bench started from a terminal) already exports DISPLAY and must keep
+	it. Only a process with none gets the virtual one.
+
+	The value is site config rather than a setting, because it belongs to the
+	machine and not to the business - two sites on one bench share the display,
+	and neither should be able to move the other's.
+	"""
+	if os.environ.get("DISPLAY"):
+		return
+	display = None
+	try:
+		display = frappe.conf.get("portal_console_display")
+	except Exception:
+		# No site bound - a bench console or a unit test. Fall through.
+		pass
+	os.environ["DISPLAY"] = str(display or DEFAULT_CONSOLE_DISPLAY)
+
+
 def launch_chromium(playwright, headless=True):
 	"""Start Chromium, or say which install step is missing.
 
@@ -67,8 +106,22 @@ def launch_chromium(playwright, headless=True):
 	boxed banner drawn for a terminal, which reaches the desk as one unreadable
 	line, so it is worth restating in the two commands that fix it.
 	"""
+	if not headless:
+		_ensure_display()
+
 	try:
-		return playwright.chromium.launch(headless=headless)
+		# --disable-gpu is not a preference. Headed Chromium on an Xvfb display
+		# still tries to composite in hardware, finds no GPU, and then fails
+		# every `Page.captureScreenshot` with "Unable to capture screenshot"
+		# while the browser itself works fine. Measured across three trials:
+		# bare headed fails, --disable-gpu passes, --window-size does not help,
+		# and headless is unaffected either way. That capture is the picture the
+		# operator matches their phone against during a UAE Pass sign-in, and
+		# `screenshot_data_uri` swallows the error - so without this they get a
+		# blank panel and the provisional text guess, silently, mid-window.
+		# Passed unconditionally so the one path nobody tests is not the only
+		# path carrying the flag.
+		return playwright.chromium.launch(headless=headless, args=["--disable-gpu"])
 	except Exception as exc:
 		detail = str(exc)
 		if "Executable doesn't exist" not in detail and "playwright install" not in detail:

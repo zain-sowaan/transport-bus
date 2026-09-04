@@ -62,6 +62,25 @@ class AuthenticationRequired(FineFetchError):
 	"""The portal needs an interactive login we cannot complete unattended."""
 
 
+class ConfirmationNotApproved(AuthenticationRequired):
+	"""A UAE Pass push went out and nobody approved it inside the window.
+
+	Split from its parent because the two need opposite remedies and the old
+	shared message gave the wrong one. `AuthenticationRequired` means the portal
+	would not take the saved sign-in, and the answer is to sign in again.
+	This means the sign-in was fine and a person did not reach their phone in
+	time; the answer is to press the button again, and telling them to re-sign-in
+	sends them round a loop they were never in.
+
+	**The class name is load-bearing.** `_apply_portal_verdict` decides whether
+	a portal refused a session by testing the Sync Run's traceback for the
+	string "AuthenticationRequired", and a missed push is not a refusal. Because
+	this name does not contain that substring, a timeout stops flipping a
+	perfectly good banked session's banner to "rejected". Renaming it to
+	anything containing the parent's name silently restores that bug.
+	"""
+
+
 class SignInWindowClosed(FineFetchError):
 	"""The sign-in window was closed before anyone finished signing in.
 

@@ -1,0 +1,16 @@
+[Unit]
+Description=websockify bridging noVNC to the sign-in display
+After=portal-console-x11vnc@%i.service
+Requires=portal-console-x11vnc@%i.service
+
+[Service]
+Type=simple
+User=%i
+# Also loopback-only. nginx terminates TLS and checks the password in front of
+# this; websockify itself authenticates nobody.
+ExecStart=/usr/bin/websockify --web=/usr/share/novnc 127.0.0.1:6080 127.0.0.1:5900
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

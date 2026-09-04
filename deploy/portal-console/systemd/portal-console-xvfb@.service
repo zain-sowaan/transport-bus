@@ -1,0 +1,18 @@
+[Unit]
+Description=Xvfb virtual display for the traffic-portal sign-in browser
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+# 1500x950 matches the viewport screenshot_data_uri() was measured against.
+# Changing it changes the size of every frame relayed to an operator, and that
+# measurement is what keeps the payload inside the realtime socket buffer.
+# -nolisten tcp: the display is reached through x11vnc on loopback, never
+# directly, so it must not open a TCP port of its own.
+ExecStart=/usr/bin/Xvfb :99 -screen 0 1500x950x24 -nolisten tcp
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

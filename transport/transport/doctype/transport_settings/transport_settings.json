@@ -46,6 +46,8 @@
   "fine_sync_login_mode",
   "relay_wait_minutes",
   "use_relay_for_scheduled_sync",
+  "enable_portal_signin_console",
+  "portal_signin_console_url",
   "sweep_status_section",
   "last_operator_sweep_on",
   "last_operator_sweep_note"
@@ -331,9 +333,9 @@
    "options": "Operator Signs In At The Server\nRelay Code To My Screen"
   },
   {
-   "default": "5",
+   "default": "10",
    "depends_on": "eval:doc.fine_sync_login_mode == 'Relay Code To My Screen'",
-   "description": "How long the relay waits for you to confirm on your phone before giving up. Minutes, not the forty-five the window allows: the UAE Pass push expires on its own, and a worker parked for three quarters of an hour helps nobody.",
+   "description": "How long the relay waits for you to confirm on your phone before giving up. Minutes, not the forty-five the window allows: the UAE Pass push expires on its own, and a worker parked for three quarters of an hour helps nobody. Ten rather than five because the clock starts at the sign-in click, so anything UAE Pass puts on screen first - a CAPTCHA especially - is spent out of the same budget that was sized for a phone tap. Clamped to 1-15.",
    "fieldname": "relay_wait_minutes",
    "fieldtype": "Int",
    "label": "Relay Wait (Minutes)",
@@ -346,6 +348,21 @@
    "fieldname": "use_relay_for_scheduled_sync",
    "fieldtype": "Check",
    "label": "Let Scheduled Syncs Start a Relay Sign-In"
+  },
+  {
+   "default": "0",
+   "description": "Off by default, and it is a real decision. The console shows a live browser that is signed in to a government portal, and anyone who can open it can drive that browser anywhere the session reaches - including the portal's own payment controls. Switching this on grants that to every user holding a Transport fine-sync role. Leave it off unless the console is actually deployed and those people are meant to have it.",
+   "fieldname": "enable_portal_signin_console",
+   "fieldtype": "Check",
+   "label": "Enable Portal Sign-In Console"
+  },
+  {
+   "depends_on": "eval:doc.enable_portal_signin_console",
+   "description": "HTTPS address of the noVNC console that shows the server's sign-in screen, e.g. <code>https://fines-console.example.com/vnc.html</code>. It must be HTTPS and it must require its own login - the console carries a live portal session, and this app does not authenticate it for you. Leave blank to disable the button without losing the address.",
+   "fieldname": "portal_signin_console_url",
+   "fieldtype": "Data",
+   "label": "Portal Sign-In Console URL",
+   "options": "URL"
   },
   {
    "fieldname": "sweep_status_section",

@@ -39,6 +39,11 @@ frappe.ui.form.on("Traffic Fine Portal", {
 				// is switched on - its whole value is answering "would this
 				// work here?" before anyone depends on it.
 				if (s.supports_relay) add_reach_test_button(frm);
+				// Not gated on the session status call: the console is about
+				// answering a challenge on a sign-in that has not happened yet,
+				// so it has to be reachable precisely when the portal looks
+				// unhealthy. Its own permission check runs server-side.
+				add_signin_console_button(frm);
 			},
 		});
 	},
@@ -270,4 +275,70 @@ function queue(frm, method, title) {
 			frappe.msgprint({ title: title, indicator: "blue", message: r.message.message });
 		},
 	});
+}
+
+// The operator's window onto the server's own screen. Everything else here
+// reports on a sign-in; this one lets somebody complete a sign-in that has
+// stalled on something only a human can clear - a reCAPTCHA image challenge,
+// which is what UAT has been hitting.
+//
+// Opened as a real tab first, and the modal offered second, deliberately. The
+// console sits on its own origin behind its own password, and browsers refuse
+// to show an HTTP Basic auth prompt inside a cross-origin iframe - so a modal
+// on a first visit renders a blank white box and nothing explains why. Once
+// the operator has authenticated to that origin in a normal tab, the browser
+// reuses those credentials and the embedded view works.
+function add_signin_console_button(frm) {
+	frm.add_custom_button(
+		__("Authenticate Traffic Portal"),
+		() => {
+			frappe.call({
+				method: "transport.transport.fine_sync.service.get_portal_signin_console",
+				callback: (r) => {
+					const c = r.message || {};
+					if (!c.available) {
+						frappe.msgprint({
+							title: __("Sign-In Console Unavailable"),
+							indicator: "orange",
+							message: c.reason || __("The sign-in console is not configured."),
+						});
+						return;
+					}
+					show_signin_console(c);
+				},
+			});
+		},
+		__("Diagnostics")
+	);
+}
+
+function show_signin_console(c) {
+	const url = c.url;
+	const dialog = new frappe.ui.Dialog({
+		title: __("Portal Sign-In Console"),
+		size: "extra-large",
+		primary_action_label: __("Open In New Tab"),
+		primary_action: () => {
+			// noopener: the console holds a live portal session, and a tab
+			// opened without it keeps a handle back to this one.
+			window.open(url, "_blank", "noopener,noreferrer");
+		},
+	});
+
+	dialog.$body.html(`
+		<div class="alert alert-warning" style="margin-bottom:12px">
+			${frappe.utils.escape_html(c.warning || "")}
+		</div>
+		<p class="text-muted small">
+			${__("If the panel below is blank, open the console in a new tab once and sign in to it. The embedded view works after that.")}
+		</p>
+		<iframe
+			src="${frappe.utils.escape_html(url)}"
+			style="width:100%;height:60vh;border:1px solid var(--border-color);border-radius:var(--border-radius-md)"
+			referrerpolicy="no-referrer"
+			title="${__("Portal sign-in console")}"
+		></iframe>
+	`);
+
+	dialog.show();
 }
