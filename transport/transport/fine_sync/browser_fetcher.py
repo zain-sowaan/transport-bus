@@ -121,7 +121,7 @@ def launch_chromium(playwright, headless=True):
 		# blank panel and the provisional text guess, silently, mid-window.
 		# Passed unconditionally so the one path nobody tests is not the only
 		# path carrying the flag.
-		return playwright.chromium.launch(headless=headless, args=["--disable-gpu"])
+		return playwright.chromium.launch(headless=headless, args=["--disable-gpu", "--disable-blink-features=AutomationControlled"])
 	except Exception as exc:
 		detail = str(exc)
 		if "Executable doesn't exist" not in detail and "playwright install" not in detail:
