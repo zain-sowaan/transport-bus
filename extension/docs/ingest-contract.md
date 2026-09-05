@@ -101,13 +101,28 @@ a fine's modal would not open — best effort per row, matching
 
 ```python
 fetcher = get_fetcher(portal_doc, credential)
-fines = [f for f in (fetcher._to_fine(row) for row in rows) if f]
+transform = getattr(fetcher, "_to_fine", None)
+if transform is None:
+    frappe.throw(_("{0} has no client fetch path.").format(portal_doc.name))
+fines = [f for f in (transform(row) for row in rows) if f]
 ```
 
 `_to_fine()` is a pure transform and touches no browser, so the fetcher can be
-constructed and never started. It is private today; a public `fines_from_rows()`
-on the fetcher would say plainly that this is a supported entry point rather
-than something reaching into internals — your call.
+constructed and never started.
+
+**It is not portal-general, and the guard is the point.** `_to_fine()` is
+defined on `TammFetcher` (`portals/tamm.py:455`) and on `MoiFetcher`
+(`portals/moi.py:356`), but not on the base fetcher and not on `SrtaFetcher` —
+it is a convention across two of the three, not a contract. Without the check,
+this method signature promises to accept any portal and answers a portal that
+has no transform with an `AttributeError` instead of something an operator can
+read.
+
+Rejecting those portals with a typed error is the right shape while TAMM is the
+only portal the extension targets. Promoting a public `fines_from_rows()` onto
+the base — `NotImplementedError` by default, overridden where a transform
+exists — is the better answer, but it is a refactor worth doing when a second
+portal actually needs one rather than on spec.
 
 From there the existing path applies unchanged: a Fine Sync Run, `_stage_fine()`
 per fine, dedup on ticket number.
