@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Transport Fine Fetch</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 28px 26px 34px;
+    max-width: 560px;
+  }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  p.lede { margin: 0 0 22px; opacity: .75; }
+  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 18px; }
+  label { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; }
+  label input { margin: 3px 0 0; }
+  .name { font-weight: 600; }
+  .why { display: block; opacity: .75; margin-top: 2px; }
+  .saved { margin-top: 22px; min-height: 18px; font-size: 13px; opacity: .8; }
+  .note { margin-top: 26px; padding-top: 16px; border-top: 1px solid rgba(128,128,128,.35); opacity: .75; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>Transport Fine Fetch</h1>
+  <p class="lede">Fetches are started from the Traffic Fine Portal record in ERPNext. These settings only change how the fetch behaves once it runs.</p>
+
+  <fieldset>
+    <label>
+      <input type="checkbox" id="closeTabWhenDone">
+      <span>
+        <span class="name">Close the fines tab when the fetch finishes</span>
+        <span class="why">Leave this off if you want to check the page yourself afterwards. Your sign-in is kept either way.</span>
+      </span>
+    </label>
+
+    <label>
+      <input type="checkbox" id="includeDetails">
+      <span>
+        <span class="name">Read each fine's details</span>
+        <span class="why">Opens every fine to read its description, ticket type and location, which the list alone does not carry. Slower — each fine is opened and closed in turn.</span>
+      </span>
+    </label>
+  </fieldset>
+
+  <p class="saved" id="saved" role="status"></p>
+
+  <p class="note">While a fetch is reading, leave the fines tab in the foreground. The page builds its later pages in the browser rather than fetching them, so a tab put to sleep loses what has already been read.</p>
+
+  <script src="options.js"></script>
+</body>
+</html>

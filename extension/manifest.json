@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Transport Fine Fetch",
+  "version": "0.1.0",
+  "description": "Reads the company traffic fines page in the operator's own browser and hands the rows to ERPNext.",
+  "minimum_chrome_version": "116",
+
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://www.tamm.abudhabi/*",
+    "http://localhost:8001/*",
+    "https://erp.example.com/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://www.tamm.abudhabi/*"],
+      "js": ["content/extractors.generated.js", "content/tamm.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["http://localhost:8001/*", "https://erp.example.com/*"],
+      "js": ["content/erp-bridge.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+
+  "options_page": "options.html"
+}
