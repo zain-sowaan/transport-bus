@@ -32,6 +32,7 @@ from transport.transport.fine_sync.base import (
 	AuthenticationRequired,
 	FetchedFine,
 	FetchResult,
+	FineFetchError,
 )
 from transport.transport.fine_sync.operator_fetcher import OperatorAssistedFetcher
 from transport.transport.fine_sync.uae_pass import RelayNotPossible, on_uae_pass, relay_sign_in
@@ -181,6 +182,12 @@ class TammFetcher(OperatorAssistedFetcher):
 	# read without anyone answering anything. That is what makes the relay
 	# possible here and impossible on MOI, which challenges on every search.
 	supports_relay = True
+
+	# The extension ships a reader for this portal - content/readers/tamm.js,
+	# whose three extraction functions are generated from the constants above
+	# so the two sides cannot drift.
+	client_reader = "tamm"
+	client_origin = "https://www.tamm.abudhabi"
 
 	def fetch_for_vehicle(self, plate_parts):
 		raise NotImplementedError(
@@ -452,6 +459,27 @@ class TammFetcher(OperatorAssistedFetcher):
 				collected[ticket] = row
 
 	# -- parsing -----------------------------------------------------------
+	def client_fetch_target(self, traffic_file_number=None):
+		"""The company fines deep link, built from the same constant the
+		server-side fetch navigates to.
+
+		The traffic file number goes into the URL here rather than being handed
+		to the extension as a value. The extension needs a page to open, not a
+		fleet identifier, and a navigation target it passes straight to
+		chrome.tabs.create is one less place the number can be stored or logged.
+		"""
+		if not traffic_file_number:
+			raise FineFetchError(
+				f"{self.portal.name} is queried by traffic file, and no active credential "
+				"carries one."
+			)
+		return {
+			"url": FINES_URL.format(tcf=traffic_file_number),
+			"origin": self.client_origin,
+			"path_prefix": "/wb/adp/pay-traffic-fines/companies",
+			"reader": self.client_reader,
+		}
+
 	def _to_fine(self, row):
 		def value(*names):
 			for name in names:

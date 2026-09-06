@@ -1,17 +1,24 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
-// Generated 2026-09-05 from tamm.py
-// by extension/tools/generate_extractors.py. Change the constants in that
-// Python module and re-run the generator; edits made here are lost and,
+// Generated 2026-09-06 from tamm.py
+// by extension/tools/generate_extractors.py. Change the constants in those
+// Python modules and re-run the generator; edits made here are lost and,
 // worse, silently diverge from what the server-side fetcher reads.
+//
+// Keyed by the `client_reader` each fetcher declares, which is the same name
+// the server returns from get_client_fetch_target - so the reader that runs
+// is always the one that portal's fetcher named.
 //
 // Each value is the portal-reading arrow function exactly as the fetcher
 // evaluates it, comments and all - so a fix to either side is one
 // regeneration away from reaching the other.
 
-globalThis.TAMM_EXTRACTORS = {
+globalThis.PORTAL_EXTRACTORS = {
 
-	// EXTRACT_ROWS_JS
-	extractRows: () => [...document.querySelectorAll('tr.ui-lib-table-row')]
+	// from tamm.py
+	tamm: {
+
+		// EXTRACT_ROWS_JS
+		extractRows: () => [...document.querySelectorAll('tr.ui-lib-table-row')]
   // The header carries the same row class as the data rows and differs only by
   // this flag. Without it the header parses into a fine whose ticket number is
   // the literal text "Fine Number" - which then stages as a real liability.
@@ -34,8 +41,8 @@ globalThis.TAMM_EXTRACTORS = {
   return row;
 }).filter(row => Object.keys(row).length > 1),
 
-	// NEXT_PAGE_JS
-	nextPage: () => {
+		// NEXT_PAGE_JS
+		nextPage: () => {
   const root = document.querySelector('.ui-lib-pagination') || document;
   const leaves = [...root.querySelectorAll('*')].filter(el =>
     el.children.length === 0 && /^\d{1,3}$/.test((el.textContent || '').trim()));
@@ -67,8 +74,8 @@ globalThis.TAMM_EXTRACTORS = {
   return null;
 },
 
-	// READ_PANEL_JS
-	readPanel: () => {
+		// READ_PANEL_JS
+		readPanel: () => {
   const labels = ['Ticket Number', 'Plate Number', 'Description',
                   'Fine Location', 'Status', 'Ticket Type'];
   const panel = [...document.querySelectorAll('div, section, aside')]
@@ -87,4 +94,9 @@ globalThis.TAMM_EXTRACTORS = {
   }
   return out;
 },
+	},
+};
+
+globalThis.PORTAL_ORIGINS = {
+ "tamm": "https://www.tamm.abudhabi"
 };

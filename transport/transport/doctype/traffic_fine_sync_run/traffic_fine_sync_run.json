@@ -1,40 +1,49 @@
 {
  "actions": [],
+ "autoname": "TR-TFS-.YYYY.-.MM.-.#####",
+ "creation": "2026-08-07 12:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
- "creation": "2026-08-07 12:00:00.000000",
- "modified": "2026-08-07 12:00:00.000000",
- "modified_by": "Administrator",
- "owner": "Administrator",
- "module": "Transport",
- "links": [],
- "states": [],
- "row_format": "Dynamic",
- "grid_page_length": 50,
- "index_web_pages_for_search": 1,
- "track_changes": 1,
- "name": "Traffic Fine Sync Run",
+ "field_order": [
+  "portal",
+  "status",
+  "col1",
+  "started_on",
+  "finished_on",
+  "triggered_by",
+  "fetch_source",
+  "sec1",
+  "vehicles_queried",
+  "vehicles_failed",
+  "col2",
+  "fines_found",
+  "fines_new",
+  "sec2",
+  "vehicles",
+  "sec3",
+  "error_log"
+ ],
  "fields": [
   {
    "fieldname": "portal",
    "fieldtype": "Link",
-   "options": "Traffic Fine Portal",
-   "label": "Portal",
-   "reqd": 1,
-   "in_list_view": 1,
-   "in_standard_filter": 1
-  },
-  {
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "label": "Status",
-   "reqd": 1,
-   "default": "Running",
    "in_list_view": 1,
    "in_standard_filter": 1,
+   "label": "Portal",
+   "options": "Traffic Fine Portal",
+   "reqd": 1
+  },
+  {
+   "default": "Running",
+   "description": "\"Completed with Errors\" means some vehicles could not be queried. Their fines are unknown, NOT zero.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
    "options": "Running\nCompleted\nCompleted with Errors\nFailed",
    "read_only": 1,
-   "description": "\"Completed with Errors\" means some vehicles could not be queried. Their fines are unknown, NOT zero."
+   "reqd": 1
   },
   {
    "fieldname": "col1",
@@ -55,8 +64,16 @@
   {
    "fieldname": "triggered_by",
    "fieldtype": "Link",
-   "options": "User",
    "label": "Triggered By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "Where the rows were read. Blank means the server read them itself - either this run predates the field, or it took the server-side path. \"Operator Browser\" means they were posted by the extension running in a person's own Chrome.",
+   "fieldname": "fetch_source",
+   "fieldtype": "Select",
+   "label": "Fetched By",
+   "options": "\nServer\nOperator Browser",
    "read_only": 1
   },
   {
@@ -100,8 +117,8 @@
   {
    "fieldname": "vehicles",
    "fieldtype": "Table",
-   "options": "Traffic Fine Sync Vehicle",
-   "label": "Vehicles"
+   "label": "Vehicles",
+   "options": "Traffic Fine Sync Vehicle"
   },
   {
    "fieldname": "sec3",
@@ -115,24 +132,14 @@
    "read_only": 1
   }
  ],
- "field_order": [
-  "portal",
-  "status",
-  "col1",
-  "started_on",
-  "finished_on",
-  "triggered_by",
-  "sec1",
-  "vehicles_queried",
-  "vehicles_failed",
-  "col2",
-  "fines_found",
-  "fines_new",
-  "sec2",
-  "vehicles",
-  "sec3",
-  "error_log"
- ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-06 11:30:53.592683",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Traffic Fine Sync Run",
+ "owner": "Administrator",
  "permissions": [
   {
    "create": 1,
@@ -168,8 +175,10 @@
    "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "autoname": "TR-TFS-.YYYY.-.MM.-.#####",
- "title_field": "portal"
+ "states": [],
+ "title_field": "portal",
+ "track_changes": 1
 }

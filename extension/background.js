@@ -4,8 +4,19 @@
 // them, and the server runs the same parser it has always run - which is what
 // keeps the two halves from drifting into two different ideas of what a fine is.
 
-const PORTAL_ORIGIN = "https://www.tamm.abudhabi";
-const FINES_PATH = "/wb/adp/pay-traffic-fines/companies";
+// No portal origin or path is hardcoded here. The server names the page to open
+// and the reader to run against it, because that is portal knowledge: TAMM
+// carries the fleet in a query parameter, a login-based portal carries it in
+// the session and takes no parameter at all. An extension that built its own
+// URLs would have to know that difference and would be wrong about it the first
+// time a portal moved.
+
+// Sent on every call to ERPNext. ngrok's free tier answers the first request
+// from a browser with an HTML interstitial instead of the thing that was asked
+// for, and this header is its documented opt-out. A fetch that receives that
+// page fails as "unexpected token < in JSON", which says nothing about the
+// actual cause; harmless everywhere else, so it is not made conditional.
+const TUNNEL_HEADERS = { "ngrok-skip-browser-warning": "true" };
 
 const INGEST_METHOD = "transport.transport.fine_sync.service.ingest_client_fetch";
 const TARGET_METHOD = "transport.transport.fine_sync.service.get_client_fetch_target";
@@ -51,21 +62,52 @@ const done = (tabId, requestId, payload) =>
 
 // -- portal tab --------------------------------------------------------------
 
-function finesUrl(trafficFileNumber) {
-	const url = new URL(FINES_PATH, PORTAL_ORIGIN);
-	url.searchParams.set("lang", "en");
-	url.searchParams.set("companyTcf", trafficFileNumber);
-	return url.toString();
-}
-
-const onFinesPage = (url) => {
+// Whether a tab has landed back on the portal's fines page, judged against the
+// origin and path the server gave us rather than anything known here.
+const onFinesPage = (url, target) => {
 	try {
 		const parsed = new URL(url);
-		return parsed.origin === PORTAL_ORIGIN && parsed.pathname.startsWith(FINES_PATH);
+		return (
+			parsed.origin === target.origin &&
+			parsed.pathname.startsWith(target.path_prefix || "/")
+		);
 	} catch {
 		return false;
 	}
 };
+
+/** Whether we may read this portal's origin.
+ *
+ * Checks only. It does NOT request: chrome.permissions.request() needs a user
+ * gesture, and by the time the click has travelled desk page -> content script
+ * -> service worker, there is none left to spend. Asking here fails silently
+ * and the operator is told to approve a prompt that never appears - which is
+ * exactly the dead end this replaced.
+ *
+ * The origins of whichever readers ship are granted in the manifest instead,
+ * written there at package time from each fetcher's `client_origin`.
+ */
+async function hasOriginPermission(origin) {
+	try {
+		return await chrome.permissions.contains({ origins: [`${origin}/*`] });
+	} catch {
+		return false;
+	}
+}
+
+/** Put the reader for this portal into the tab.
+ *
+ * Injected rather than declared in the manifest, for the same reason the origin
+ * is requested rather than granted: the set of portals is server-side data, and
+ * a static content_scripts entry cannot name a host this build has never seen.
+ * The extractors go in first - the reader calls them.
+ */
+async function injectReader(tabId, reader) {
+	await chrome.scripting.executeScript({
+		target: { tabId },
+		files: ["content/extractors.generated.js", `content/readers/${reader}.js`],
+	});
+}
 
 /** Resolve once the tab is sitting on the fines page with its document loaded.
  *
@@ -74,7 +116,7 @@ const onFinesPage = (url) => {
  * the tab has landed back on the portal - waiting for the *page*, not for the
  * operator, which is why this survives however many redirects the sign-in takes.
  */
-function waitForFinesPage(tabId, timeoutMs) {
+function waitForFinesPage(tabId, timeoutMs, target) {
 	return new Promise((resolve) => {
 		let settled = false;
 
@@ -90,7 +132,7 @@ function waitForFinesPage(tabId, timeoutMs) {
 		const onUpdated = (updatedId, info, tab) => {
 			if (updatedId !== tabId) return;
 			if (info.status !== "complete") return;
-			if (onFinesPage(tab.url || "")) finish("ready");
+			if (onFinesPage(tab.url || "", target)) finish("ready");
 		};
 
 		const onRemoved = (removedId) => {
@@ -105,7 +147,7 @@ function waitForFinesPage(tabId, timeoutMs) {
 		// The tab may already be there - a banked session lands straight on the
 		// fines page and fires no further update.
 		chrome.tabs.get(tabId).then((tab) => {
-			if (tab && tab.status === "complete" && onFinesPage(tab.url || "")) finish("ready");
+			if (tab && tab.status === "complete" && onFinesPage(tab.url || "", target)) finish("ready");
 		}).catch(() => finish("tab-closed"));
 	});
 }
@@ -130,7 +172,7 @@ async function fetchTarget(erpOrigin, portal) {
 	const response = await fetch(url.toString(), {
 		method: "GET",
 		credentials: "include",
-		headers: { Accept: "application/json" },
+		headers: { Accept: "application/json", ...TUNNEL_HEADERS },
 	});
 
 	let payload = null;
@@ -166,6 +208,7 @@ async function ingest({ erpOrigin, csrfToken, portal, rows, truncated }) {
 			"Content-Type": "application/json",
 			Accept: "application/json",
 			"X-Frappe-CSRF-Token": csrfToken || "",
+			...TUNNEL_HEADERS,
 		},
 		body: JSON.stringify({ portal, rows, truncated, fetched_at: new Date().toISOString() }),
 	});
@@ -203,24 +246,41 @@ async function runFetch(request, deskTabId, erpOrigin) {
 	try {
 		progress(deskTabId, requestId, "opening", "Opening the fines page…");
 
+		// The server answers with a page to open and a reader to run, or it
+		// refuses and says why. A portal with no reader is refused there, not
+		// here: the extension must never fall back to "run the nearest reader
+		// and see", because a reader written for another portal's markup finds
+		// no rows, and no rows is indistinguishable from a fleet with no fines.
 		const target = await fetchTarget(erpOrigin, portal);
-		const trafficFileNumber = target.traffic_file_number;
-		if (!trafficFileNumber) {
+		if (!target.url || !target.origin || !target.reader) {
 			return {
 				ok: false,
 				message:
-					"This portal has no active credential carrying a traffic file number, so " +
-					"there is no page to open. Add one in ERPNext first.",
+					"The server did not name a page and a reader for this portal, so there " +
+					"is nothing to open. Nothing was read.",
+			};
+		}
+
+		if (!(await hasOriginPermission(target.origin))) {
+			// A build whose manifest does not grant the origin its own reader
+			// needs. Not something an operator can fix from here, so say what is
+			// actually wrong rather than sending them to look for a prompt.
+			return {
+				ok: false,
+				message:
+					`This build is not allowed to read ${target.origin}, so the fines page ` +
+					"cannot be opened. The extension needs rebuilding with that address " +
+					"granted - tell the team rather than retrying.",
 			};
 		}
 
 		// Active on purpose. Chrome may freeze or discard a background tab, and
 		// this portal's pagination is client-side - a discarded tab loses the
 		// rows already walked, with no way to ask for page three again.
-		const tab = await chrome.tabs.create({ url: finesUrl(trafficFileNumber), active: true });
+		const tab = await chrome.tabs.create({ url: target.url, active: true });
 		portalTabId = tab.id;
 
-		const landed = await waitForFinesPage(portalTabId, SIGN_IN_WINDOW_MS);
+		const landed = await waitForFinesPage(portalTabId, SIGN_IN_WINDOW_MS, target);
 		if (landed === "tab-closed") {
 			return { ok: false, message: "The fines tab was closed before anything was read." };
 		}
@@ -234,6 +294,20 @@ async function runFetch(request, deskTabId, erpOrigin) {
 		}
 
 		progress(deskTabId, requestId, "reading", "Reading the fines table…");
+
+		// After landing, not before: signing in navigates away and back, and an
+		// injection made earlier would have been torn down with the page it was
+		// injected into.
+		try {
+			await injectReader(portalTabId, target.reader);
+		} catch (err) {
+			return {
+				ok: false,
+				message:
+					`The reader for this portal could not be loaded (${err && err.message}). ` +
+					"Nothing was read.",
+			};
+		}
 
 		const read = await chrome.tabs.sendMessage(portalTabId, {
 			type: "TFF_READ",

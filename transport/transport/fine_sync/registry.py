@@ -12,6 +12,7 @@ import frappe
 from frappe import _
 
 from transport.transport.fine_sync.portals.moi import MoiFetcher
+from transport.transport.fine_sync.portals.rta import RtaFetcher
 from transport.transport.fine_sync.portals.srta import SrtaFetcher
 from transport.transport.fine_sync.portals.tamm import TammFetcher
 
@@ -30,6 +31,11 @@ FETCHERS_BY_KEY = {
 	# is keyed here like any other fetcher so the same run/staging machinery
 	# applies, but it can never be scheduled - see TammFetcher's module docs.
 	"tamm": TammFetcher,
+	# Registered without being able to fetch. RtaFetcher's whole job is to
+	# refuse with the actual reason - the fines page has never been captured -
+	# rather than let RTA fall through to "no fetcher is implemented", which
+	# reads as though the portal were unrecognised. See portals/rta.py.
+	"rta": RtaFetcher,
 }
 
 

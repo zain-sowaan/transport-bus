@@ -136,6 +136,26 @@ class FineFetcher:
 	# to work, return nothing, and be read as "this vehicle has no fines".
 	fetch_implemented = True
 
+	# The reader the browser extension runs against this portal's page, or None
+	# where no reader exists. This is the CLIENT-side twin of fetch_implemented,
+	# and it is separate on purpose: a portal can be readable by a browser on
+	# the server and have no extension reader, or the reverse.
+	#
+	# None means the extension must refuse the portal by name. It must never
+	# mean "run the nearest reader and see" - a reader written against another
+	# portal's markup finds no rows, and no rows is reported as a clean, empty
+	# result. "This fleet has no fines in Dubai" is the single most expensive
+	# sentence this module can produce, and it must never be produced by
+	# guessing.
+	client_reader = None
+
+	# The origin the reader runs on, e.g. "https://www.tamm.abudhabi". Read at
+	# package time to grant the extension access to it: Chrome only prompts for
+	# an optional permission on a user gesture, and the button's gesture is spent
+	# on the desk page long before the service worker could ask. So the origins
+	# of whichever readers ship are granted in the manifest instead.
+	client_origin = None
+
 	# Wall-clock budget for the fetching itself, in seconds; None is unbounded.
 	# The caller sets it, but the fetcher decides when to start the clock, so
 	# that waiting for a person to sign in never spends time meant for reading
@@ -155,6 +175,23 @@ class FineFetcher:
 
 	def out_of_time(self):
 		return self._deadline is not None and time.monotonic() >= self._deadline
+
+	def client_fetch_target(self, traffic_file_number=None):
+		"""Where the operator's browser should go, and which reader to run.
+
+		Returns `{"url", "origin", "path_prefix", "reader"}`. The URL is built
+		here rather than in the extension because the portal's entry point is
+		portal knowledge - TAMM carries the fleet in a query parameter, a
+		login-based portal carries it in the session and takes no parameter at
+		all. An extension that built its own URLs would have to know that
+		difference, and would be wrong about it the first time a portal moved.
+
+		Raises by default. A fetcher that declares a `client_reader` must
+		override this; one that does not should never be asked.
+		"""
+		raise NotImplementedError(
+			f"{type(self).__name__} declares no client fetch target."
+		)
 
 	def fetch_for_vehicle(self, plate_parts) -> FetchResult:
 		"""Return the fines for one vehicle.

@@ -8,10 +8,19 @@
 frappe.ui.form.on("Traffic Fine Portal", {
 	refresh(frm) {
 		if (frm.is_new()) return;
-		// Only the portals whose fetch needs a person in front of it. A portal
-		// the server can read on its own has no use for a button that opens a
-		// tab on this machine.
-		if (frm.doc.fetch_mode !== "Operator Assisted") return;
+		// Enabled portals only. NOT gated on fetch_mode = "Operator Assisted",
+		// which was the first shape and excluded the one portal this exists for:
+		// TAMM is marked "Automated", and it is exactly the portal the server
+		// cannot reliably read on its own - the CAPTCHA rate on the server's
+		// address is why the extension was written. fetch_mode answers "should
+		// this run unattended", which is a different question from "can a person
+		// read it in their own browser".
+		//
+		// Portals the extension has no reader for are refused by the server, by
+		// name, when the button is pressed: ingest_client_fetch and
+		// get_client_fetch_target both throw "has no client fetch path". A
+		// readable refusal on click beats a button that silently never appears.
+		if (!frm.doc.is_enabled) return;
 
 		frm.add_custom_button(__("Fetch Fines In This Browser"), () => start_fetch(frm));
 

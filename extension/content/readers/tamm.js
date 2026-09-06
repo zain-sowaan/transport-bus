@@ -17,7 +17,7 @@
 	if (globalThis.__tffTammLoaded) return;
 	globalThis.__tffTammLoaded = true;
 
-	const { extractRows, nextPage, readPanel } = globalThis.TAMM_EXTRACTORS;
+	const { extractRows, nextPage, readPanel } = globalThis.PORTAL_EXTRACTORS.tamm;
 
 	// Mirrors the fetcher's own grace. Checking once, immediately after the
 	// navigation resolves, is what used to make a live session look dead: the

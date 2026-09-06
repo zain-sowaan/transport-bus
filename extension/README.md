@@ -29,10 +29,12 @@ way `deploy/` does: files a human installs somewhere else.
 ```
 manifest.json                     MV3. Edit host_permissions for your ERP host.
 background.js                     Opens the portal tab, waits, reads, posts up.
-content/tamm.js                   Runs in the portal tab: the wait, the pager walk,
-                                  the detail modals.
-content/extractors.generated.js   GENERATED. The three reading functions, lifted
-                                  verbatim from the Python fetcher.
+content/readers/<reader>.js       Runs in the portal tab: the wait, the pager walk,
+                                  the detail modals. One per portal, injected by
+                                  name - the server says which.
+content/extractors.generated.js   GENERATED. The three reading functions per
+                                  portal, lifted verbatim from the Python
+                                  fetchers and keyed by client_reader.
 content/erp-bridge.js             Relays between the desk page and the extension.
 options.html / options.js         Two settings.
 erpnext/…client_script.js         Paste into a Client Script. The whole ERPNext
@@ -64,9 +66,11 @@ The generator reads `tamm.py`; it never writes to it.
 ## Install, on an operator's machine
 
 1. **Point it at your ERPNext host.** In `manifest.json`, replace
-   `https://erp.example.com/*` in both `host_permissions` and the second
+   `https://erp.example.com/*` in both `host_permissions` and the
    `content_scripts` entry. Both need it: one to post results, one to inject the
-   bridge. `http://localhost:8001/*` is already there for a dev bench.
+   bridge. `http://localhost:8001/*` is already there for a dev bench. Portal
+   origins need no edit — they are optional permissions, requested per origin
+   when the button is pressed.
 2. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick
    this directory.
 3. In ERPNext, create a **Client Script** on DocType `Traffic Fine Portal`,
@@ -125,7 +129,8 @@ a decision, not a detail.
 | `storage` | Two checkboxes on the options page. |
 | `tabs` | Open the fines tab, notice when it lands, close it when done. |
 | `scripting` | Content scripts on the portal and the desk. |
-| `host_permissions` | The portal, to read it; the ERP host, to post results. |
+| `host_permissions` | The ERP host only, to post results and inject the bridge. |
+| `optional_host_permissions` | Portal origins, requested one at a time when the button is pressed. Not granted at install, and never for a portal the server has not named. |
 
 **`cookies` is not requested.** An earlier design had the extension read the
 portal session cookie and hand it to the server to continue headlessly. That
@@ -137,6 +142,26 @@ expression of not doing it.
 **No credential is ever typed, and no CAPTCHA is ever answered.** If the portal
 challenges, the person sitting in front of the tab answers it, which is not the
 same thing as a program solving one.
+
+## Packaging a build for somebody else
+
+```bash
+tools/package.sh --erp-origin https://your-bench.example.dev -o ~/fine-fetch.zip
+tools/package.sh                    # reads extension/.erp-origin if present
+```
+
+The address is written into the **staging copy only**: the manifest goes into the
+zip with that origin already granted, and `config.js` carries it as the options
+page's default, so whoever receives the zip installs it and is finished. The
+manifest and `config.js` in this repository are never modified.
+
+That split is deliberate and not just tidiness. This repository is public, and a
+tunnel or bench address is a live way in to a system holding real fleet data. It
+belongs in a zip handed to one named person, not in source anybody can read.
+`extension/.erp-origin` is gitignored for the same reason.
+
+`docs/demo-handout.md` is the install guide to send with the zip. It assumes no
+technical background and no file editing.
 
 ## Deployment beyond one machine
 

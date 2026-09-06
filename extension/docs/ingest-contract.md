@@ -22,24 +22,47 @@ GET /api/method/transport.transport.fine_sync.service.get_client_fetch_target?po
 **Returns**
 
 ```json
-{ "message": { "traffic_file_number": "…" } }
+{ "message": {
+    "url": "https://…the page to open…",
+    "origin": "https://www.tamm.abudhabi",
+    "path_prefix": "/wb/adp/pay-traffic-fines/companies",
+    "reader": "tamm"
+} }
 ```
 
-**Why it exists.** The extension has to build the portal URL, and the traffic
-file number is the only thing in it that names the fleet. Asking the server
-keeps the number out of the desk page's JavaScript and out of the window message
-between page and extension — the same standard `get_relay_mobile()` already
-applies to the sign-in phone number, and for the same reason.
+**It does not return the traffic file number.** An earlier shape did, and the
+extension built the URL itself. That was TAMM's shape mistaken for every
+portal's: TAMM carries the fleet in a query parameter, a login-based portal
+carries it in the session and takes no parameter at all. An extension building
+its own URLs has to know that difference and is wrong about it the first time a
+portal moves.
+
+So the server builds the target. The fleet identifier is read from the
+credential, embedded in a URL that goes straight to `chrome.tabs.create`, and is
+never a value the extension holds - one less place it can be stored or logged.
+
+**`reader`** names the reading code to run, and is the `client_reader` the
+portal's fetcher declares. The generated extractors are keyed by the same name,
+so the reader that runs is always the one that portal's fetcher named.
+
+**Refusals are the interesting case.** The server answers with a reason, not a
+generic failure, and the extension shows the server's wording:
+
+| Situation | What the server says |
+|---|---|
+| No fetcher at all | `No fetcher is implemented for …` |
+| Fetcher, no reader | `… has no client fetch path.` |
+| Fetcher that knows why | its own message - RTA explains that its fines page has never been captured and what would unblock it |
+
+That distinction is the point. "No client fetch path" and "nobody has ever seen
+this portal's fines table, here is what would unblock it" are different answers,
+and flattening them loses the only part that tells somebody what to do next.
 
 **Requirements**
 
-- Run `_check_permission()`. This is the gate on who may start a fetch.
-- Read the number from the active `Traffic Fine Portal Credential` for that
-  portal, exactly as `enqueue_operator_assisted_sync` does today.
-- Throw the existing "no active credential" message when there isn't one; the
-  extension surfaces the server's own wording.
-- Return nothing else. Not the mobile number, not the session state, not the
-  credential name.
+- `_check_permission()`, `is_enabled`, `has_written_authorization`.
+- Return no reader ⇒ refuse. A target without a reader would send the browser to
+  a real page with nothing to read it, and an unread page reports no fines.
 
 ---
 
@@ -102,7 +125,7 @@ a fine's modal would not open — best effort per row, matching
 ```python
 fetcher = get_fetcher(portal_doc, credential)
 transform = getattr(fetcher, "_to_fine", None)
-if transform is None:
+if not getattr(fetcher, "client_reader", None) or transform is None:
     frappe.throw(_("{0} has no client fetch path.").format(portal_doc.name))
 fines = [f for f in (transform(row) for row in rows) if f]
 ```

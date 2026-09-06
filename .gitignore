@@ -5,3 +5,6 @@
 tags
 node_modules
 __pycache__
+# Build-time ERP address for a packaged extension. Never committed: the repo
+# is public and this is a live way in to a bench holding real fleet data.
+extension/.erp-origin

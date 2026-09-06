@@ -20,6 +20,26 @@
   .why { display: block; opacity: .75; margin-top: 2px; }
   .saved { margin-top: 22px; min-height: 18px; font-size: 13px; opacity: .8; }
   .note { margin-top: 26px; padding-top: 16px; border-top: 1px solid rgba(128,128,128,.35); opacity: .75; font-size: 13px; }
+  label.wide { grid-template-columns: 1fr; gap: 8px; }
+  .row { display: flex; gap: 8px; }
+  .row input {
+    flex: 1; min-width: 0; padding: 7px 9px; font: inherit;
+    border: 1px solid rgba(128,128,128,.55); border-radius: 6px;
+    background: Field; color: FieldText;
+  }
+  .row button {
+    padding: 7px 15px; font: inherit; font-weight: 600; cursor: pointer;
+    border: 1px solid rgba(128,128,128,.55); border-radius: 6px;
+    background: ButtonFace; color: ButtonText;
+  }
+  .status { font-size: 13px; min-height: 17px; }
+  .status.ok { color: #1a7f42; }
+  .status.bad { color: #b3261e; }
+  @media (prefers-color-scheme: dark) {
+    .status.ok { color: #6ee7a0; }
+    .status.bad { color: #ff9b93; }
+  }
+  code { font-size: 12.5px; background: rgba(128,128,128,.16); padding: 1px 4px; border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -27,6 +47,18 @@
   <p class="lede">Fetches are started from the Traffic Fine Portal record in ERPNext. These settings only change how the fetch behaves once it runs.</p>
 
   <fieldset>
+    <label class="wide">
+      <span>
+        <span class="name">ERPNext address</span>
+        <span class="why">The address you open ERPNext at, exactly as it appears in the browser bar &mdash; including <code>https://</code> and any port. Paste a tunnel address here when testing; nothing else needs changing, and you can change it again whenever the address does.</span>
+      </span>
+      <span class="row">
+        <input type="url" id="erpOrigin" placeholder="https://example.ngrok-free.app" spellcheck="false">
+        <button type="button" id="saveOrigin">Connect</button>
+      </span>
+      <span class="status" id="originStatus" role="status"></span>
+    </label>
+
     <label>
       <input type="checkbox" id="closeTabWhenDone">
       <span>
@@ -48,6 +80,7 @@
 
   <p class="note">While a fetch is reading, leave the fines tab in the foreground. The page builds its later pages in the browser rather than fetching them, so a tab put to sleep loses what has already been read.</p>
 
+  <script src="config.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

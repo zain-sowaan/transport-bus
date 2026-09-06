@@ -690,6 +690,26 @@ def _operator_assisted_sync(
 	return outcome
 
 
+def _long_queue_depth():
+	"""How many jobs are waiting on `long`, or None if that cannot be read.
+
+	Reported back to the button so "queued" can say how long a wait it really
+	is. One worker serves this queue, so depth is very nearly the wait: each
+	job ahead is a browser fetch measured in minutes, not milliseconds.
+
+	Never raises. This is a nicety attached to a fetch that has already been
+	queued successfully, and a broken count is not a reason to fail the call.
+	"""
+	try:
+		from rq import Queue
+
+		from frappe.utils.background_jobs import get_redis_conn
+
+		return Queue("long", connection=get_redis_conn()).count
+	except Exception:
+		return None
+
+
 @frappe.whitelist()
 def enqueue_operator_assisted_sync(portal, include_details=1):
 	"""The "Fetch Fines Now" button. Queues the run and returns immediately.
@@ -724,10 +744,23 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 
 		get_relay_mobile()
 
-	frappe.enqueue(
+	# at_front, because this is the one fine-sync job with a person waiting on
+	# it. Everything else on `long` - the hourly sweep, the capture, the reach
+	# probe - is batch work nobody is watching, and RQ's default tail insert put
+	# the button behind all of it.
+	#
+	# It buys less than it sounds like. There is ONE worker on `long`
+	# (`worker_long: bench worker --queue long`, background_workers = 1), and
+	# at_front reorders the QUEUE, not the worker. A sweep already in flight
+	# holds the worker for as long as it runs - up to the 3600s timeout below -
+	# and this job waits it out from the front. Front of the queue is the most
+	# that can be fixed here; the rest needs its own worker, which is a bench
+	# config change and not something this function can do.
+	job = frappe.enqueue(
 		"transport.transport.fine_sync.service.run_operator_assisted_sync",
 		queue="long",
 		timeout=3600,
+		at_front=True,
 		portal=portal,
 		traffic_file_number=traffic_file_number,
 		include_details=include_details,
@@ -735,8 +768,21 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 		use_relay=1 if relaying else 0,
 		notify_user=frappe.session.user,
 	)
+	if not job:
+		# enqueue() returns nothing when it drops the call - a dead queue, or a
+		# duplicate it deduplicated. Reporting {"queued": True} regardless is how
+		# an operator ends up watching for a window that was never going to open.
+		frappe.throw(
+			_("The fetch could not be queued. The background queue is not accepting "
+			  "work - check that the queue's Redis and a worker for the 'long' queue "
+			  "are both running, then try again."),
+			title=_("Fetch Not Queued"),
+		)
+
 	return {
 		"queued": True,
+		"job_id": getattr(job, "id", None),
+		"ahead": _long_queue_depth(),
 		"portal": portal,
 		"relay": relaying,
 		"event": RELAY_EVENT,
@@ -747,6 +793,252 @@ def enqueue_operator_assisted_sync(portal, include_details=1):
 			else _("Fetch queued. A browser window will open on the server for sign-in; "
 			       "watch Traffic Fine Sync Run for the result.")
 		),
+	}
+
+
+# --- Client-side fetch -------------------------------------------------------
+#
+# The operator's own Chrome reads the portal and posts the rendered rows here,
+# instead of a browser being driven on the server. The parsing stays on this
+# side: the extension hands up rows exactly as the page produced them, and the
+# same `_to_fine` that the server-side fetch uses turns them into fines, so the
+# two paths cannot drift into two different ideas of what a fine is.
+#
+# The contract is written up in extension/docs/ingest-contract.md.
+
+# A whole-fleet TAMM list runs to a few hundred rows. Five thousand is far past
+# any real read and still small enough that the transform below cannot be used
+# to tie the worker up.
+MAX_CLIENT_FETCH_ROWS = 5000
+
+
+def _client_fetch_target(fetcher, portal_doc, traffic_file_number):
+	"""Where the extension should navigate, or a refusal that says why.
+
+	One code path for every portal. A fetcher that can be read in a browser
+	overrides `client_fetch_target`; the base class raises NotImplementedError,
+	and a fetcher that knows something more specific - RTA knows its page has
+	never been captured - raises FineFetchError carrying that reason.
+
+	The distinction matters to whoever presses the button. "No client fetch
+	path" and "nobody has ever seen this portal's fines table, here is what
+	would unblock it" are different answers, and flattening them into one loses
+	the only part that tells somebody what to do next.
+	"""
+	try:
+		target = fetcher.client_fetch_target(traffic_file_number)
+	except NotImplementedError:
+		frappe.throw(
+			_("{0} has no client fetch path. The extension has no reader for this portal, "
+			  "so there is nothing for it to open.").format(portal_doc.name),
+			title=_("Portal Not Supported"),
+		)
+	except FineFetchError as exc:
+		frappe.throw(str(exc), title=_("Portal Not Readable Yet"))
+
+	if not target.get("reader"):
+		# A fetcher that returns a target without naming a reader would send the
+		# browser to a real page with nothing to read it. Refusing is the only
+		# safe answer: an unread page reports no fines, and no fines reads as a
+		# clean result.
+		frappe.throw(
+			_("{0} returned no reader, so its page cannot be read.").format(portal_doc.name),
+			title=_("Portal Not Supported"),
+		)
+	return target
+
+
+def _client_fetch_portal(portal):
+	"""The portal doc, checked for a client-side fetch, or throw.
+
+	Shared by both halves so the button and the ingest cannot disagree about
+	who is allowed to do this.
+
+	`is_enabled` is required here although `_operator_assisted_sync` deliberately
+	does not require it. That exemption exists because a named operator standing
+	at the server's own browser is not unattended access. This path is a browser
+	on a machine this site does not control, posting rows it says it read, and
+	the flag is the only place the site records that it wants this portal touched
+	at all.
+	"""
+	_check_permission()
+
+	portal_doc = frappe.get_doc("Traffic Fine Portal", portal)
+	if not portal_doc.is_enabled:
+		frappe.throw(
+			_("{0} is switched off. Enable it before fetching from it.").format(portal_doc.name),
+			title=_("Portal Not Enabled"),
+		)
+	if not portal_doc.has_written_authorization:
+		frappe.throw(
+			_("Record the written authorization for {0} before fetching from it.").format(
+				portal_doc.name
+			),
+			title=_("Authorization Required"),
+		)
+	return portal_doc
+
+
+@frappe.whitelist()
+def get_client_fetch_target(portal):
+	"""Which fleet the operator's browser should ask the portal about.
+
+	The traffic file number is the only part of the portal URL that names the
+	fleet, and the extension needs it to navigate. It is handed over this
+	authenticated call rather than rendered into the desk page, for the reason
+	`get_relay_mobile()` already exists: anything else running in that tab can
+	read the page's JavaScript and the window messages it posts.
+
+	Returns the number and nothing else - not the mobile, not the session
+	state, not the credential's name.
+	"""
+	portal_doc = _client_fetch_portal(portal)
+
+	# The traffic file number is read here but not returned. TAMM carries the
+	# fleet in a query parameter, so its fetcher builds it into the URL; a
+	# login-based portal carries the fleet in the session and takes no
+	# parameter at all. Handing the extension a page to open rather than a
+	# fleet identifier keeps that difference where it belongs, and is one less
+	# place the number can be stored or logged.
+	traffic_file_number = frappe.db.get_value(
+		"Traffic Fine Portal Credential",
+		{"portal": portal_doc.name, "is_active": 1},
+		"traffic_file_number",
+	)
+
+	fetcher = get_fetcher(portal_doc)
+	try:
+		target = _client_fetch_target(fetcher, portal_doc, traffic_file_number)
+	finally:
+		fetcher.close()
+
+	return target
+
+
+@frappe.whitelist(methods=["POST"])
+def ingest_client_fetch(portal, rows, truncated=0, fetched_at=None):
+	"""Stage fines that the operator's browser read from the portal.
+
+	Note what this does NOT accept: the traffic file number. A browser that
+	could name the traffic file could attach a batch of fines to any fleet on
+	the site. The credential is re-read here instead, so the rows can only ever
+	land against the fleet this portal is configured for.
+
+	Every value in `rows` is untrusted text. It arrives from a browser, and a
+	row is not evidence that a page was ever visited - which is why the run
+	records where it came from rather than presenting these fines as though the
+	server had seen them itself.
+	"""
+	portal_doc = _client_fetch_portal(portal)
+
+	if not frappe.db.exists(
+		"Traffic Fine Portal Credential", {"portal": portal_doc.name, "is_active": 1}
+	):
+		frappe.throw(
+			_("{0} has no active credential. Rows cannot be attached to a fleet without "
+			  "one.").format(portal_doc.name),
+			title=_("Traffic File Number Missing"),
+		)
+
+	if isinstance(rows, str):
+		try:
+			rows = json.loads(rows)
+		except ValueError:
+			frappe.throw(_("Rows were not valid JSON."), title=_("Malformed Fetch"))
+	if not isinstance(rows, list):
+		frappe.throw(_("Rows must be a list."), title=_("Malformed Fetch"))
+	if len(rows) > MAX_CLIENT_FETCH_ROWS:
+		frappe.throw(
+			_("This batch carries {0} rows, past the {1} a single fetch may post.").format(
+				len(rows), MAX_CLIENT_FETCH_ROWS
+			),
+			title=_("Batch Too Large"),
+		)
+	if any(not isinstance(row, dict) for row in rows):
+		frappe.throw(_("Every row must be an object."), title=_("Malformed Fetch"))
+
+	truncated = bool(int(truncated or 0))
+
+	# Before the run record, not inside it: a portal with no transform is a
+	# configuration answer, not a failed fetch, and it should not leave a
+	# Failed run behind suggesting the portal was actually read.
+	fetcher = get_fetcher(portal_doc)
+	transform = getattr(fetcher, "_to_fine", None)
+	if not getattr(fetcher, "client_reader", None) or transform is None:
+		# Two conditions, because they can fail apart. MOI has a `_to_fine` and
+		# no reader; a portal could be given a reader before its transform is
+		# written. Either way there is no complete route, and accepting rows on
+		# half a route stages fines nobody can account for.
+		#
+		# Checked again here and not only in get_client_fetch_target: that call
+		# is advice to a browser, this one is a write. A caller that skipped the
+		# first must not thereby skip the gate.
+		fetcher.close()
+		frappe.throw(
+			_("{0} has no client fetch path. Its rows cannot be turned into fines on this "
+			  "route.").format(portal_doc.name),
+			title=_("Portal Not Supported"),
+		)
+
+	run = frappe.get_doc({
+		"doctype": "Traffic Fine Sync Run",
+		"portal": portal_doc.name,
+		"status": "Running",
+		"started_on": now_datetime(),
+		"triggered_by": frappe.session.user,
+		"fetch_source": "Operator Browser",
+	})
+	run.insert(ignore_permissions=True)
+	_checkpoint()
+
+	error_log, staged, reason = None, 0, None
+	try:
+		# _to_fine returns None for anything that is not a fine - headers,
+		# totals, the placeholder row an empty list renders.
+		fines = [f for f in (transform(row) for row in rows) if f]
+		for fine in fines:
+			vehicle = _vehicle_for_plate(fine.raw.get("plate_code"), fine.raw.get("plate_number"))
+			if _stage_fine(run, portal_doc, vehicle, fine):
+				staged += 1
+			run.add_vehicle_result(
+				vehicle.name if vehicle else None,
+				fine.plate,
+				"Success",
+				None if vehicle else _("No Rental Vehicle matches this plate - fine is unlinked."),
+				1,
+			)
+			_checkpoint()
+		run.fines_found = len(fines)
+		run.fines_new = staged
+		if truncated:
+			# The read stopped at its budget with pages still unread. Calling
+			# that "Completed" would present part of the list as the whole
+			# liability, which is the one thing this flag exists to prevent.
+			run.status = "Completed with Errors"
+			reason = _(
+				"The browser stopped before the end of the list, so these are some of the "
+				"fines and not all of them. A fine missing from this batch was never seen - "
+				"that is not the same as it not existing."
+			)
+			error_log = reason
+	except Exception as exc:
+		run.status = "Failed"
+		error_log = frappe.get_traceback()
+		reason = _describe_fetch_failure(exc)
+		_log_error(f"Client fine fetch failed: {portal_doc.name}")
+	finally:
+		fetcher.close()
+		_checkpoint()
+		run.finalize(error_log=error_log)
+		_checkpoint()
+
+	return {
+		"sync_run": run.name,
+		"status": run.status,
+		"fines_found": run.fines_found,
+		"fines_new": run.fines_new,
+		"truncated": truncated,
+		"reason": reason,
 	}
 
 
