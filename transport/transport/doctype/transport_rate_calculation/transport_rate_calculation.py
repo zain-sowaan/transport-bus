@@ -109,6 +109,19 @@ class TransportRateCalculation(Document):
 			row.line_proposed_price = flt(row.proposed_price) * qty
 			row.line_final_price = row.final_price * qty
 			row.line_margin = row.line_final_price - row.line_total_cost
+			# Margin on COST, matching the two figures either side of it: the
+			# floor is built as cost x (1 + minimum_margin_percent / 100), and
+			# the parent's Total Margin % divides by cost as well. That makes
+			# this directly comparable to the row's own Minimum Margin % -
+			# equal means priced exactly at the floor, lower means under it -
+			# which is the comparison an estimator is actually making. Dividing
+			# by revenue would be the accountant's "gross margin" and would read
+			# 20% on a row whose stated minimum is 25%, with nothing wrong.
+			#
+			# qty cancels, so this is per-vehicle and per-line at once.
+			row.margin_percent = (
+				row.line_margin / row.line_total_cost * 100 if row.line_total_cost else 0
+			)
 
 		self.total_estimated_cost = sum(flt(r.line_total_cost) for r in self.vehicles)
 		self.total_minimum_price = sum(flt(r.line_minimum_price) for r in self.vehicles)

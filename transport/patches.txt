@@ -1,6 +1,7 @@
 [pre_model_sync]
 # Patches added in this section will be executed before doctypes are migrated
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
+transport.patches.seed_margin_percent_before_percent_cast
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -20,3 +21,4 @@ transport.patches.remove_duplicate_portal_client_script
 transport.patches.set_transport_settings_defaults_p10
 transport.patches.update_evg_and_moi_portal_access
 transport.patches.raise_relay_wait_to_ten
+transport.patches.recalculate_rate_calculations_for_margin_percent
