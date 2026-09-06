@@ -14,7 +14,38 @@ app_license = "mit"
 fixtures = [
 	{
 		"doctype": "Custom Field",
-		"filters": {"module": "Transport"},
+		# Everything EXCEPT the fields on Place, which live in
+		# fixtures/custom_field_place.json instead. Not tidiness - blast radius.
+		#
+		# Frappe imports a fixture file record by record and STOPS THE FILE at
+		# the first record whose DocType is missing. utils/fixtures.py catches
+		# the DoesNotExistError per file and prints "Skipping fixture syncing
+		# from the file ..." to stdout, which nobody reads during a deploy.
+		# Records before the failure are already written; every record after it
+		# is lost. Measured both ways: with the bad record last, 2 of 2 good
+		# fields survived; with it first, 0 of 2.
+		#
+		# `Place` belongs to fleetify, and on a site whose fleetify predates it
+		# those three fields were records #1, #2 and #3 of 59 - so the file died
+		# on its first record and took all 56 others with it, across eight
+		# doctypes that have nothing to do with fleetify. A UAT site ran a month
+		# that way, every report and list view reading one of those fields
+		# failing with an unknown-column error naming the column and not the
+		# cause.
+		#
+		# Note how fragile that was: export orders by "idx asc, creation asc",
+		# so where the Place records land is incidental. A re-export could move
+		# them last and mask the whole thing - which is the other reason not to
+		# leave this to luck.
+		#
+		# Split this way, the same missing dependency costs 3 fields, the other
+		# 56 install, and the skip message names the file that is actually
+		# about Place.
+		#
+		# **The exclusion has to be here as well as in the file**, because
+		# `bench export-fixtures` regenerates custom_field.json from this
+		# filter and would pull the Place fields straight back in.
+		"filters": [["module", "=", "Transport"], ["dt", "!=", "Place"]],
 	},
 	{
 		"doctype": "Role",
