@@ -50,8 +50,9 @@ redis-server config/redis_queue.conf --daemonize yes
    infrastructure and this repository is public.
 2. `chrome://extensions` → **Developer mode** → **Load unpacked** → pick
    `apps/transport/extension`.
-3. In ERPNext: **Client Script** → new → DocType `Traffic Fine Portal`, Apply To
-   `Form`, paste `erpnext/traffic_fine_portal.client_script.js`, save, enable.
+3. Nothing to do in ERPNext. The Client Script is an app fixture, so `bench
+   migrate` has created and enabled it; check the Client Script list for
+   `Traffic Fine Portal-transport-client-fetch` if the button never appears.
 4. Reload the desk, open an enabled portal record. **Fetch Fines In This
    Browser** appears under the top-right menu.
 

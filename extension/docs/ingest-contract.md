@@ -5,9 +5,10 @@ up exactly as the page produced them, so the server keeps running the parser it
 already has and the two halves cannot drift into two different ideas of what a
 fine is.
 
-That needs two whitelisted methods, neither of which exists yet. Both belong in
-`transport/transport/fine_sync/service.py`, which is owned by the fine-sync
-session — **this file is the specification, not an instruction to add them.**
+That needs two whitelisted methods. Both now exist in
+`transport/transport/fine_sync/service.py`; what follows is the specification
+they were written against, and remains the description of what the server
+accepts.
 
 ---
 

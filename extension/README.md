@@ -16,13 +16,17 @@ the only reason this directory exists.
 
 ## Status
 
-**Scaffold. Not yet wired end to end.** The two server methods it calls do not
-exist — see [`docs/ingest-contract.md`](docs/ingest-contract.md), which is the
-specification for them. They belong in `fine_sync/service.py`, owned by the
-fine-sync session, so they are written up here rather than added.
+The two server methods it calls now exist — `get_client_fetch_target` and
+`ingest_client_fetch` in `fine_sync/service.py`, written against
+[`docs/ingest-contract.md`](docs/ingest-contract.md), which is still the
+description of what the server accepts. Whether the whole path has been walked
+against a live portal is a separate question; [`docs/testing.md`](docs/testing.md)
+is the run-through.
 
 Nothing in this directory is loaded by the Frappe app. It ships alongside it the
-way `deploy/` does: files a human installs somewhere else.
+way `deploy/` does: files a human installs into Chrome. The desk-side Client
+Script is the one part that is not a hand install, and it no longer lives here —
+it ships as an app fixture in `transport/fixtures/client_script.json`.
 
 ## Layout
 
@@ -37,10 +41,8 @@ content/extractors.generated.js   GENERATED. The three reading functions per
                                   fetchers and keyed by client_reader.
 content/erp-bridge.js             Relays between the desk page and the extension.
 options.html / options.js         Two settings.
-erpnext/…client_script.js         Paste into a Client Script. The whole ERPNext
-                                  footprint: one button.
 tools/generate_extractors.py      Regenerates the extractors from tamm.py.
-docs/ingest-contract.md           What the server must accept. For the peer session.
+docs/ingest-contract.md           What the server must accept.
 ```
 
 ## The extractors are generated, not copied
@@ -73,11 +75,12 @@ The generator reads `tamm.py`; it never writes to it.
    when the button is pressed.
 2. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick
    this directory.
-3. In ERPNext, create a **Client Script** on DocType `Traffic Fine Portal`,
-   Apply To `Form`, and paste
-   [`erpnext/traffic_fine_portal.client_script.js`](erpnext/traffic_fine_portal.client_script.js).
+3. Nothing to install on the ERPNext side. The Client Script ships as an app
+   fixture, so `bench migrate` has already created it — the desk half of this
+   extension needs no paste and no per-site setup.
 4. Reload the desk. Open the portal record — **Fetch Fines In This Browser**
-   appears on portals whose Fetch Mode is *Operator Assisted*.
+   appears on any portal that is enabled. Deliberately not gated on Fetch Mode:
+   TAMM is marked *Automated* and is the one portal this path exists for.
 
 If the button reports the extension is missing, the manifest's origins do not
 match the desk's origin. Scheme and port both count.

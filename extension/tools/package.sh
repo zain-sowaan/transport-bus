@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build the zip an operator or reviewer loads into Chrome.
 #
-# Ships only what the browser needs. docs/, tools/ and erpnext/ are for whoever
-# installs the ERPNext side; putting them in the zip invites someone to think
-# the Client Script installs itself.
+# Ships only what the browser needs. docs/ and tools/ are for whoever maintains
+# this side, not the operator, so they stay out of the zip. The ERPNext half
+# needs nothing here at all: its Client Script installs with the app.
 #
 # The build can carry the address of the bench it was built for, so a reviewer
 # has nothing to paste and nothing to grant:
