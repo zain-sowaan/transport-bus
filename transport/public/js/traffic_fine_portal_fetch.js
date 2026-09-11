@@ -56,11 +56,26 @@
 	// extension is not installed, not enabled, or not permitted on this origin.
 	let bridge_version = null;
 
+	// Every DISTINCT extension that answered. Normally one. Two means two copies
+	// of Fine Fetch are loaded - a packaged build and the repository directory is
+	// the easy way to end up there - and that is worth refusing rather than
+	// letting through: each copy has its own isolated world and its own service
+	// worker, so neither the bridge's own load guard nor the worker's in-flight
+	// lock can see the other. One press then opens two tabs and runs two fetches
+	// against the portal, which is twice the traffic on somebody else's service
+	// for no extra fines.
+	const bridge_ids = new Set();
+
 	window.addEventListener("message", (event) => {
 		if (event.source !== window || event.origin !== window.location.origin) return;
 		const data = event.data;
 		if (!data || data.source !== BRIDGE_FROM_EXTENSION) return;
-		if (data.kind === "READY" || data.kind === "PONG") bridge_version = data.version;
+		if (data.kind === "READY" || data.kind === "PONG") {
+			bridge_version = data.version;
+			// Older builds send no id. Fall back to the version so they still
+			// count as one bridge rather than as none.
+			bridge_ids.add(data.id || `legacy:${data.version}`);
+		}
 	});
 
 	function start_fetch(frm) {
@@ -81,6 +96,22 @@
 						"than this one. Open the extension's options page, press Connect with exactly " +
 						"<b>{0}</b>, then reload this page.",
 					[window.location.origin]
+				),
+			});
+			return;
+		}
+
+		if (bridge_ids.size > 1) {
+			frappe.msgprint({
+				title: __("More than one Fine Fetch extension"),
+				indicator: "red",
+				message: __(
+					"{0} copies of the Fine Fetch extension answered on this page, so pressing " +
+						"Fetch would open {0} tabs and run {0} separate fetches against the portal.<br><br>" +
+						"Open <code>chrome://extensions</code> and remove all but one, then reload " +
+						"this page. Loading the repository folder and a packaged copy of it at the " +
+						"same time is the usual cause.",
+					[bridge_ids.size]
 				),
 			});
 			return;

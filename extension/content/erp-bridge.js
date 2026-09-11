@@ -69,7 +69,16 @@
 			// extension" and shows its own install-and-reload message, which is
 			// the right advice; answering with a version would tell it the bridge
 			// is healthy moments before the next call throws.
-			if (alive()) toPage({ kind: "PONG", requestId: data.requestId, version: version() });
+			//
+			// The id is sent so the desk can count how many DISTINCT extensions
+			// answer. Two copies of this extension loaded at once - a packaged
+			// build and the repository directory, say - each get their own
+			// isolated world and their own service worker, so neither the
+			// __tffBridgeLoaded guard above nor the worker's inFlight lock sees
+			// the other, and one button press opens two tabs and runs two fetches.
+			if (alive()) {
+				toPage({ kind: "PONG", requestId: data.requestId, version: version(), id: chrome.runtime.id });
+			}
 			return;
 		}
 
@@ -137,5 +146,5 @@
 	// Lets the desk tell "extension missing" from "extension busy" the moment
 	// the form loads, instead of after a fetch that was never going to start.
 	const loaded = version();
-	if (loaded) toPage({ kind: "READY", version: loaded });
+	if (loaded) toPage({ kind: "READY", version: loaded, id: chrome.runtime.id });
 })();
