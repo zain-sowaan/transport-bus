@@ -105,7 +105,13 @@ required_apps = ["fleetify", "hrms"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+#
+# The desk half of the browser extension. A doctype_js file, deliberately, and
+# not a Client Script fixture: Frappe merges every Client Script for a doctype
+# into one new Function(), so a second copy declaring the same top-level const
+# takes down every script on the form. Shipped this way it is ordinary app code
+# - versioned, reviewed and deployed with the rest - and it cannot collide.
+doctype_js = {"Traffic Fine Portal": "public/js/traffic_fine_portal_fetch.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}

@@ -24,9 +24,16 @@ against a live portal is a separate question; [`docs/testing.md`](docs/testing.m
 is the run-through.
 
 Nothing in this directory is loaded by the Frappe app. It ships alongside it the
-way `deploy/` does: files a human installs into Chrome. The desk-side Client
-Script is the one part that is not a hand install, and it no longer lives here —
-it ships as an app fixture in `transport/fixtures/client_script.json`.
+way `deploy/` does: files a human installs into Chrome. The desk-side script is
+the one part that is not a hand install, and it no longer lives here — it is
+ordinary app code at `transport/public/js/traffic_fine_portal_fetch.js`, loaded
+by `doctype_js` in `hooks.py`.
+
+It was briefly a Client Script fixture, which was a mistake worth recording:
+Frappe merges every Client Script for a doctype into one `new Function()`, so a
+leftover hand-pasted copy declaring the same top-level `const` turned the
+combined body into a SyntaxError and the form loaded none of its scripts at all.
+A `doctype_js` file is served on its own and cannot collide that way.
 
 ## Layout
 
@@ -75,9 +82,9 @@ The generator reads `tamm.py`; it never writes to it.
    when the button is pressed.
 2. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick
    this directory.
-3. Nothing to install on the ERPNext side. The Client Script ships as an app
-   fixture, so `bench migrate` has already created it — the desk half of this
-   extension needs no paste and no per-site setup.
+3. Nothing to install on the ERPNext side. The desk script is loaded by
+   `doctype_js`, so it is present wherever the app is — no paste, no fixture,
+   no per-site setup.
 4. Reload the desk. Open the portal record — **Fetch Fines In This Browser**
    appears on any portal that is enabled. Deliberately not gated on Fetch Mode:
    TAMM is marked *Automated* and is the one portal this path exists for.
