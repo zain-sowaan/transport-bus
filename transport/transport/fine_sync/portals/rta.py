@@ -163,6 +163,26 @@ AMOUNT_RE = re.compile(r"([\d,]+(?:\.\d{1,2})?)")
 # used as the ticket number.
 ROW_KEY_RE = re.compile(r"\b(C?TCK)_(\d+)\b")
 
+# RTA's three lists, mapped onto what the staging doctype's portal_status Select
+# will actually accept: "", "Payable", "Unpayable".
+#
+# This mapping is not cosmetic - writing RTA's own wording straight through is a
+# ValidationError inside _stage_fine, and because that raises mid-loop it fails
+# the WHOLE run after some fines have already staged. The run then reads Failed
+# while carrying real rows, which is the worst of both answers.
+#
+# "Non-Payable" maps to "Unpayable" because they mean the same thing and TAMM
+# got there first: a fine that cannot be settled on the portal and has to go
+# through the issuing authority. RTA's own subtitle for the payable list says
+# exactly that - "fines that can be cleared without referring to the source
+# authority". Black points sit under a tab RTA labels "Payable Black Points",
+# so they are payable.
+PORTAL_STATUS_BY_LIST = {
+	"Payable": "Payable",
+	"Non-Payable": "Unpayable",
+	"Black Points": "Payable",
+}
+
 
 # Each row is a stack of <div><span>Label</span>Value</div>, except the first,
 # which carries the vehicle description and has no label at all. Reading the
@@ -397,7 +417,17 @@ class RtaFetcher(OperatorAssistedFetcher):
 				# assumed: a non-payable fine has to go through the issuing
 				# authority, and recording it as payable would put it in front of
 				# somebody as though it could be settled from the portal.
-				"portal_status": row.get("_tab") or "Payable",
+				#
+				# Anything unrecognised becomes "", never a guess and never the
+				# portal's own wording - an invalid Select value fails the insert
+				# and takes the rest of the run with it.
+				"portal_status": PORTAL_STATUS_BY_LIST.get(row.get("_tab"), "")
+				if row.get("_tab")
+				else "Payable",
+				# RTA's own label for the list, kept because the mapping above is
+				# lossy: Payable and Black Points both land on "Payable", and this
+				# is the only place that difference survives.
+				"rta_list": row.get("_tab") or None,
 				"online_declaration": self._present(details.get("Online declaration")),
 				# RTA's internal key, kept for traceability only.
 				"rta_row_kind": row.get("_rowKind"),
