@@ -1,5 +1,5 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
-// Generated 2026-09-06 from tamm.py
+// Generated 2026-09-11 from rta.py, tamm.py
 // by extension/tools/generate_extractors.py. Change the constants in those
 // Python modules and re-run the generator; edits made here are lost and,
 // worse, silently diverge from what the server-side fetcher reads.
@@ -13,6 +13,91 @@
 // regeneration away from reaching the other.
 
 globalThis.PORTAL_EXTRACTORS = {
+
+	// from rta.py
+	rta: {
+
+		// EXTRACT_ROWS_JS
+		extractRows: () => [...document.querySelectorAll('div.finesRowList')].map(list => {
+  const row = {};
+  const cells = [...list.children];
+
+  // First cell, no label: "MAKE MODEL, YEAR, COLOUR". Kept whole rather than
+  // split - the make can itself contain a comma, and nothing downstream needs
+  // the pieces.
+  if (cells.length) row.vehicle = (cells[0].innerText || '').trim();
+
+  cells.slice(1).forEach(cell => {
+    const label = cell.querySelector('span');
+    if (!label) return;
+    const key = (label.textContent || '').trim().replace(/:$/, '');
+    // The value is everything the label is not. Subtracting the label's own
+    // text is what keeps "Amount" out of "Amount AED 200".
+    const value = (cell.innerText || '').replace(label.textContent || '', '').trim();
+    if (key) row[key] = value;
+  });
+
+  // RTA's internal row key, on the selection checkbox. Recorded because it is
+  // the only identifier present before a detail panel is opened, which makes it
+  // the one way to tell "this row was read" from "this row was skipped".
+  const tr = list.closest('tr');
+  const box = tr && tr.querySelector('input.p-checkbox-input');
+  const aria = (box && box.getAttribute('aria-label')) || '';
+  const key = aria.match(/\b(C?TCK)_(\d+)\b/);
+  if (key) { row._rowKind = key[1]; row._rowId = key[2]; }
+
+  return row;
+}).filter(row => Object.keys(row).length > 1),
+
+		// NEXT_PAGE_JS
+		nextPage: () => {
+  const next = document.querySelector('.p-paginator-next');
+  if (!next) return null;
+  if (next.disabled || next.classList.contains('p-disabled')) return null;
+  next.click();
+  return true;
+},
+
+		// READ_PANEL_JS
+		readPanel: () => {
+  const list = document.querySelector('div.dataList');
+  if (!list) return null;
+  const out = {};
+
+  [...list.children].forEach(cell => {
+    if (cell.tagName !== 'DIV') return;
+    const label = cell.querySelector('span');
+    if (!label) return;
+    const key = (label.textContent || '').trim().replace(/:$/, '');
+    if (!key) return;
+    const value = cell.querySelector('p');
+    if (value) { out[key] = (value.textContent || '').trim(); return; }
+    // No <p>: the value is the <ul> that follows this div.
+    const after = cell.nextElementSibling;
+    if (after && after.tagName === 'UL') {
+      out[key] = [...after.querySelectorAll('li')]
+        .map(li => (li.innerText || '').trim()).filter(Boolean).join('; ');
+    }
+  });
+
+  // The plate is structured markup, so the code and the number come out as
+  // separate values instead of a string that has to be split back apart.
+  const info = document.querySelector('div.vInfo');
+  if (info) {
+    const heading = info.querySelector('h4');
+    if (heading) out._vehicle = (heading.textContent || '').trim();
+    const plate = info.querySelector('[data-testid="PlateComponent"]');
+    if (plate) {
+      const code = plate.querySelector('[data-testid="PlateCharacter"]');
+      out._code = code ? (code.textContent || '').trim() : null;
+      const number = [...plate.children].find(child => child !== code);
+      out._number = number ? (number.textContent || '').trim() : null;
+    }
+  }
+
+  return out;
+},
+	},
 
 	// from tamm.py
 	tamm: {
@@ -98,5 +183,6 @@ globalThis.PORTAL_EXTRACTORS = {
 };
 
 globalThis.PORTAL_ORIGINS = {
+ "rta": "https://ums.rta.ae",
  "tamm": "https://www.tamm.abudhabi"
 };

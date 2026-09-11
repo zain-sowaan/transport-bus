@@ -314,6 +314,11 @@ async function runFetch(request, deskTabId, erpOrigin) {
 			requestId,
 			includeDetails,
 			budgetMs: READ_BUDGET_MS,
+			// Present only for portals whose results have no addressable URL, so
+			// the reader has to submit the search itself. Forwarded untouched and
+			// never stored here: the worker holds it for the length of one
+			// message, the same way it holds the target URL.
+			prefill: target.prefill || null,
 		});
 
 		if (!read || !read.ok) {
@@ -341,11 +346,21 @@ async function runFetch(request, deskTabId, erpOrigin) {
 			portalTabId = null;
 		}
 
+		// Coverage, where the reader reports it. A portal that splits its fines
+		// across several lists can be read completely or partly, and the count
+		// alone cannot tell those apart - so the lists that yielded nothing are
+		// named rather than folded into the total.
+		const unread = (read.coverage || []).filter((c) => c.read === null);
+		const coverageNote = unread.length
+			? ` Not read: ${unread.map((c) => `${c.list} (${c.reason})`).join(", ")}.`
+			: "";
+
 		return {
 			ok: true,
 			staged: result.staged,
-			truncated: read.truncated,
-			message: result.message || `${read.rows.length} fine(s) sent to ERPNext.`,
+			truncated: read.truncated || unread.length > 0,
+			message:
+				(result.message || `${read.rows.length} fine(s) sent to ERPNext.`) + coverageNote,
 		};
 	} catch (error) {
 		return { ok: false, message: String((error && error.message) || error) };
@@ -365,6 +380,32 @@ function describeReadFailure(state) {
 		return (
 			"Signed in, but the fines table never appeared. Nothing was read - if the page looks " +
 			"normal in the tab, press Fetch Fines Now again."
+		);
+	}
+	if (state === "session-expired") {
+		return (
+			"The portal ended the session before the read finished, so this is a partial " +
+			"answer at best. Nothing already sent is wrong, but fines may be missing - press " +
+			"Fetch Fines In This Browser again to read it in one go."
+		);
+	}
+	if (state === "no-prefill") {
+		return (
+			"This portal is searched by traffic file, and the server sent no number to search " +
+			"with. Check that the portal has an active credential carrying one. Nothing was read."
+		);
+	}
+	if (state === "no-form" || state === "no-search-button") {
+		return (
+			"The portal's search form was not where this build expects it, so the search was " +
+			"never submitted. Nothing was read - the page has probably changed and the reader " +
+			"needs updating."
+		);
+	}
+	if (state === "no-results") {
+		return (
+			"The search was submitted but the portal never showed a result. Nothing was read - " +
+			"it may have asked for a sign-in or a challenge in the tab."
 		);
 	}
 	return "The fines page could not be read. Nothing was staged.";

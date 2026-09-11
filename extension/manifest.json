@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "http://localhost:8001/*",
-    "https://www.tamm.abudhabi/*"
+    "https://www.tamm.abudhabi/*",
+    "https://ums.rta.ae/*"
   ],
   "background": {
     "service_worker": "background.js"

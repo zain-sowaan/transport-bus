@@ -35,6 +35,7 @@ from transport.transport.fine_sync.base import (
 	FineFetchError,
 )
 from transport.transport.fine_sync.operator_fetcher import OperatorAssistedFetcher
+from transport.transport.vehicle_plate import normalize_emirate
 from transport.transport.fine_sync.uae_pass import RelayNotPossible, on_uae_pass, relay_sign_in
 
 FINES_URL = "https://www.tamm.abudhabi/wb/adp/pay-traffic-fines/companies?lang=en&companyTcf={tcf}"
@@ -502,6 +503,15 @@ class TammFetcher(OperatorAssistedFetcher):
 		points = POINTS_RE.search(types)
 		details = row.get("_details") or {}
 
+		# TAMM renders the issuing emirate on the number plate itself, in Arabic,
+		# and EXTRACT_ROWS_JS has always captured it as `_emirate`. It used to be
+		# discarded and "Abu Dhabi" written in its place, which is wrong on this
+		# portal specifically: a company traffic file aggregates Abu Dhabi Police,
+		# Dubai and the Integrated Transport Center, so a Dubai plate genuinely
+		# appears here. Abu Dhabi remains the fallback - it is this portal's own
+		# emirate and the overwhelming majority - but a plate that names one wins.
+		emirate = normalize_emirate(row.get("_emirate")) or "Abu Dhabi"
+
 		return FetchedFine(
 			ticket_number=ticket,
 			amount=face,
@@ -511,13 +521,15 @@ class TammFetcher(OperatorAssistedFetcher):
 			# a different thing entirely from where the offence happened.
 			fine_type=None,
 			fine_location=details.get("Fine Location") or None,
-			plate=" ".join(part for part in ("Abu Dhabi", code, number) if part),
+			plate=" ".join(part for part in (emirate, code, number) if part),
 			black_points=int(points.group(1)) if points else 0,
 			raw={
 				"issuing_authority": value("source", "issuedBy").strip() or None,
 				"face_amount": face,
 				"discounted_amount": discounted,
 				"tamm_status": "Unpayable" if "unpayable" in types.lower() else "Payable",
+				# Passed to _vehicle_for_plate, which can no longer assume one.
+				"plate_emirate": emirate,
 				"plate_code": code,
 				"plate_number": number,
 				# Why the fine was issued, in the authority's own words.

@@ -31,7 +31,7 @@ from transport.transport.fine_sync.base import (
 )
 from transport.transport.fine_sync.browser_fetcher import BrowserFetcher
 from transport.transport.fine_sync.registry import fetcher_class_for, get_fetcher, is_supported
-from transport.transport.vehicle_plate import PLATE_FIELDS
+from transport.transport.vehicle_plate import PLATE_FIELDS, normalize_emirate
 
 SYNC_ROLES = ("Transport Accounts", "Transport Operations", "System Manager")
 
@@ -624,7 +624,11 @@ def _operator_assisted_sync(
 			wait_for_login=attended,
 		)
 		for fine in result.fines:
-			vehicle = _vehicle_for_plate(fine.raw.get("plate_code"), fine.raw.get("plate_number"))
+			vehicle = _vehicle_for_plate(
+				fine.raw.get("plate_code"),
+				fine.raw.get("plate_number"),
+				fine.raw.get("plate_emirate"),
+			)
 			if _stage_fine(run, portal_doc, vehicle, fine):
 				staged += 1
 			run.add_vehicle_result(
@@ -997,7 +1001,11 @@ def ingest_client_fetch(portal, rows, truncated=0, fetched_at=None):
 		# totals, the placeholder row an empty list renders.
 		fines = [f for f in (transform(row) for row in rows) if f]
 		for fine in fines:
-			vehicle = _vehicle_for_plate(fine.raw.get("plate_code"), fine.raw.get("plate_number"))
+			vehicle = _vehicle_for_plate(
+				fine.raw.get("plate_code"),
+				fine.raw.get("plate_number"),
+				fine.raw.get("plate_emirate"),
+			)
 			if _stage_fine(run, portal_doc, vehicle, fine):
 				staged += 1
 			run.add_vehicle_result(
@@ -1499,6 +1507,14 @@ def get_portal_session_status(portal):
 
 	status = portal_session_reading(fetcher, portal_doc)
 	status["fetch_implemented"] = bool(getattr(fetcher, "fetch_implemented", True))
+	# Whether the browser extension has a reader for this portal. Deliberately
+	# separate from fetch_implemented: the two used to be false together and for
+	# the same reason ("nobody has ever seen this page"), and RTA is the first
+	# portal where they diverge - its pages are read, but only in a person's own
+	# browser. Reporting one as though it were the other tells an operator the
+	# page has never been captured while a working button sits next to the
+	# message saying otherwise.
+	status["client_fetch_available"] = bool(getattr(fetcher, "client_reader", None))
 	status["can_capture"] = hasattr(fetcher, "capture_signed_in")
 	# Every button on the form is gated on one of these. They are answered here,
 	# together, because the form previously had two independent scripts each
@@ -1517,16 +1533,30 @@ def get_portal_session_status(portal):
 	status["relay_blocked_reason"] = relay["reason"]
 
 	if not status["fetch_implemented"]:
-		# Say what is actually missing. "No live session" would be true and
-		# useless here - signing in would not help, because nothing can read
-		# the pages a sign-in reaches.
-		status["indicator"] = "orange"
-		status["message"] = _(
-			"{0} cannot be fetched yet: its pages behind the sign-in have never been "
-			"captured, so there is nothing to read them with. Signing in will not change "
-			"that - run Capture Portal Pages with an operator signed in, and the fetch "
-			"can be written from what it records."
-		).format(portal_doc.name)
+		if status["client_fetch_available"]:
+			# Not a gap. This portal is read in the operator's own browser, and
+			# saying "never captured" here would contradict the working button
+			# beside it. Blue, not orange: nothing is broken and nothing is
+			# waiting on anybody.
+			status["indicator"] = "blue"
+			status["message"] = _(
+				"{0} is read in your own browser, not on the server. Press Fetch Fines In "
+				"This Browser: the extension opens the portal, you complete anything it "
+				"asks for, and it reads the list back. Run Sync and the unattended sweep "
+				"stay off for this portal until it is known whether the same search draws "
+				"a challenge when a server repeats it."
+			).format(portal_doc.name)
+		else:
+			# Say what is actually missing. "No live session" would be true and
+			# useless here - signing in would not help, because nothing can read
+			# the pages a sign-in reaches.
+			status["indicator"] = "orange"
+			status["message"] = _(
+				"{0} cannot be fetched yet: its pages behind the sign-in have never been "
+				"captured, so there is nothing to read them with. Signing in will not change "
+				"that - run Capture Portal Pages with an operator signed in, and the fetch "
+				"can be written from what it records."
+			).format(portal_doc.name)
 
 	return status
 
@@ -1987,21 +2017,60 @@ def _enrich_staging_row(name, vehicle, fine):
 		row.db_set(updates, update_modified=False)
 
 
-def _vehicle_for_plate(plate_code, plate_number):
+def _vehicle_for_plate(plate_code, plate_number, plate_emirate=None):
 	"""Match a reported plate to a fleet vehicle, or return None.
 
 	Returns a shape `_stage_fine` and `add_vehicle_result` can both use.
+
+	**The emirate used to be hardcoded to "Abu Dhabi".** That was true of the
+	only portal there was, and it silently became false the moment a second one
+	arrived: RTA reports Dubai plates, and every one of them failed to match a
+	vehicle that was sitting in the fleet. Worse, it failed *invisibly* - the
+	fine staged unlinked, which is indistinguishable from "this car is not ours"
+	and is exactly the signal the "our fleet is smaller than the portal thinks"
+	reading was drawn from.
+
+	Three outcomes, and the third is the one worth the extra query:
+
+	* one match - the vehicle,
+	* no match - genuinely not in the fleet, as before,
+	* **more than one match - None, deliberately.** Plate codes and numbers
+	  repeat across emirates, so a fine whose emirate is unknown can land on two
+	  real, different vehicles. Picking either would bill one customer for the
+	  other's fine. Returning None stages the fine unlinked, where a person
+	  decides.
 	"""
 	if not (plate_code and plate_number):
 		return None
-	name = frappe.db.get_value(
-		"Rental Vehicle",
-		{"plate_emirate": "Abu Dhabi", "plate_code": plate_code, "plate_number": plate_number},
-		"name",
+
+	# Stored plate parts are upper-cased and trimmed by `normalize_plate`, so a
+	# portal writing "w" or " W " has to be folded the same way or it will not
+	# match a vehicle that is plainly there.
+	filters = {
+		"plate_code": str(plate_code).strip().upper(),
+		"plate_number": str(plate_number).strip().upper(),
+	}
+
+	emirate = normalize_emirate(plate_emirate)
+	if emirate:
+		filters["plate_emirate"] = emirate
+
+	# limit 2 is all the question needs: "exactly one" and "more than one" are
+	# the only answers that differ, and neither needs the whole list.
+	matches = frappe.get_all(
+		"Rental Vehicle", filters=filters, fields=["name", "license_plate"], limit=2
 	)
-	if not name:
+	if len(matches) != 1:
 		return None
-	return frappe._dict({"name": name, "license_plate": name})
+
+	vehicle = matches[0]
+	return frappe._dict({
+		"name": vehicle.name,
+		# The vehicle's own plate as the fleet records it, not its docname. The
+		# two are usually the same string and were conflated here; they are not
+		# the same thing, and the run's per-vehicle rows show this one.
+		"license_plate": vehicle.license_plate or vehicle.name,
+	})
 
 
 @frappe.whitelist()

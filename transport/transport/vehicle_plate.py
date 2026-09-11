@@ -25,6 +25,104 @@ PLATE_FIELDS = ("plate_emirate", "plate_code", "plate_number")
 # option list, so it is trimmed but never upper-cased.
 UPPERCASED_FIELDS = ("plate_code", "plate_number")
 
+# The Select's options, in its own order and casing. Anything written to
+# plate_emirate has to be one of these exactly, or the field holds a value the
+# form cannot render and no filter will ever match.
+EMIRATES = (
+	"Abu Dhabi",
+	"Dubai",
+	"Sharjah",
+	"Ajman",
+	"Umm Al Quwain",
+	"Ras Al Khaimah",
+	"Fujairah",
+)
+
+# What the portals actually emit, mapped onto those options.
+#
+# Keys are already folded by `_fold()` below - lower-cased, stripped of spaces,
+# punctuation and the Arabic definite article - so one key covers "Abu Dhabi",
+# "abu-dhabi" and "ABUDHABI" without seven entries each.
+#
+# The Arabic forms are here because TAMM reads the emirate off the rendered
+# number plate, where it is Arabic: its extractor already captures
+# `.ui-lib-number-plate__serial-area-item-ar` and, until now, threw it away.
+_EMIRATE_ALIASES = {
+	"abudhabi": "Abu Dhabi",
+	"adh": "Abu Dhabi",
+	"ad": "Abu Dhabi",
+	"ابوظبي": "Abu Dhabi",
+	"dubai": "Dubai",
+	"dxb": "Dubai",
+	"دبي": "Dubai",
+	"sharjah": "Sharjah",
+	"shj": "Sharjah",
+	"شارقه": "Sharjah",
+	"شارقة": "Sharjah",
+	"ajman": "Ajman",
+	"ajm": "Ajman",
+	"عجمان": "Ajman",
+	"ummalquwain": "Umm Al Quwain",
+	"ummalquwan": "Umm Al Quwain",
+	"uaq": "Umm Al Quwain",
+	"امالقيوين": "Umm Al Quwain",
+	"rasalkhaimah": "Ras Al Khaimah",
+	"rasalkhaima": "Ras Al Khaimah",
+	"rak": "Ras Al Khaimah",
+	"راسالخيمه": "Ras Al Khaimah",
+	"راسالخيمة": "Ras Al Khaimah",
+	"fujairah": "Fujairah",
+	"fujairh": "Fujairah",
+	"fuj": "Fujairah",
+	"فجيره": "Fujairah",
+	"فجيرة": "Fujairah",
+}
+
+
+def _fold(text):
+	"""Reduce a written emirate to a comparable key.
+
+	Arabic needs three normalisations that Latin text does not: the alef
+	variants (أ إ آ) are written interchangeably, the taa marbuta (ة) and haa
+	(ه) are routinely swapped at the end of a word, and the definite article
+	"ال" prefixes most emirate names in some renderings and not others. Folding
+	all three means "الشارقة" and "شارقه" reach the same key.
+	"""
+	value = (text or "").strip().lower()
+	if not value:
+		return ""
+	for variants, canonical in (("\u0623\u0625\u0622", "\u0627"), ("\u0629", "\u0647")):
+		for ch in variants:
+			value = value.replace(ch, canonical)
+	# Drop everything that is not a letter or digit - spaces, hyphens, the
+	# Arabic tatweel, stray punctuation from a scraped cell.
+	value = "".join(ch for ch in value if ch.isalnum())
+	# The definite article, only where something is left after removing it.
+	if value.startswith("\u0627\u0644") and len(value) > 2:
+		value = value[2:]
+	return value
+
+
+def normalize_emirate(text):
+	"""A portal's emirate as one of `EMIRATES`, or None if it is not one.
+
+	None is a real answer and callers must treat it as "unknown", never as a
+	default. Guessing an emirate is how a Dubai fine gets matched against an
+	Abu Dhabi vehicle that happens to share a plate code and number - two
+	different cars, one of which is about to be billed for the other's fine.
+	"""
+	folded = _fold(text)
+	if not folded:
+		return None
+	direct = _EMIRATE_ALIASES.get(folded)
+	if direct:
+		return direct
+	# An exact option written in some other casing or spacing.
+	for emirate in EMIRATES:
+		if _fold(emirate) == folded:
+			return emirate
+	return None
+
 
 def normalize_plate(doc, method=None):
 	"""Trim and upper-case the plate parts, then refuse a half-filled set.
