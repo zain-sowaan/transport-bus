@@ -310,6 +310,12 @@ permission_query_conditions = {
 	"Trip": "transport.transport.permissions.get_trip_permission_query_conditions",
 	"Trip Expense": "transport.transport.permissions.get_trip_expense_permission_query_conditions",
 	"Customer Request": "transport.transport.permissions.get_customer_request_permission_query_conditions",
+	# Temporary, and it belongs in THIS dict rather than a second one near the
+	# commented example above: hooks.py is an ordinary module, so a second
+	# `permission_query_conditions = {...}` does not merge, it rebinds - the
+	# earlier one is discarded in silence and its hook simply never runs.
+	# Remove this line to show all thirteen portals again.
+	"Traffic Fine Portal": "transport.transport.portal_visibility.portal_query_conditions",
 }
 
 has_permission = {
