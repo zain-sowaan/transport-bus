@@ -317,6 +317,16 @@ class RtaFetcher(OperatorAssistedFetcher):
 	client_reader = "rta"
 	client_origin = "https://ums.rta.ae"
 
+	# Nobody has to touch the tab. The traffic-file inquiry is a public form -
+	# no sign-in, no OTP, and no challenge observed on it - so the reader types
+	# the number, presses Search and reads the result without anyone watching.
+	# Pressing the button is the whole of the operator's involvement.
+	#
+	# This does not make RTA schedulable; supports_unattended stays False. The
+	# distinction is the point: this says a person need not ACT, not that a
+	# person need not be there.
+	client_unattended = True
+
 	def fetch_for_vehicle(self, plate_parts):
 		raise FineFetchError(f"{self.portal.name}: {SERVER_FETCH_REASON}")
 
@@ -353,6 +363,9 @@ class RtaFetcher(OperatorAssistedFetcher):
 			# must, because the reader arrives before the search is submitted.
 			"path_prefix": "/violations/public-fines",
 			"reader": self.client_reader,
+			# Lets the extension open this in the background and stop waiting on
+			# a sign-in that is never coming.
+			"unattended": self.client_unattended,
 			"prefill": {
 				"tab": "Traffic Code Number",
 				"selector": "#Id_trafficFileNumber",

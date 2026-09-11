@@ -26,6 +26,13 @@ const TARGET_METHOD = "transport.transport.fine_sync.service.get_client_fetch_ta
 // then has to repeat.
 const SIGN_IN_WINDOW_MS = 45 * 60 * 1000;
 
+// The same wait for a portal the server says needs nobody. It is a page load,
+// not a person, so the budget is a page load's. Using the sign-in window here
+// was not merely generous - a portal that failed to render simply hung for
+// three quarters of an hour with a dialog saying "Opening the fines page",
+// which reads as a broken extension rather than a page that did not load.
+const UNATTENDED_LANDING_MS = 90 * 1000;
+
 // How long the reading itself may take once the table is up. Reading is not
 // waiting: this bounds the pager walk and the detail modals, not the operator.
 const READ_BUDGET_MS = 25 * 60 * 1000;
@@ -274,22 +281,45 @@ async function runFetch(request, deskTabId, erpOrigin) {
 			};
 		}
 
-		// Active on purpose. Chrome may freeze or discard a background tab, and
-		// this portal's pagination is client-side - a discarded tab loses the
-		// rows already walked, with no way to ask for page three again.
-		const tab = await chrome.tabs.create({ url: target.url, active: true });
+		// Foreground only where a person has something to do in the tab.
+		//
+		// It used to be active unconditionally, and the reason was TAMM's:
+		// Chrome may freeze or discard a background tab, and TAMM's pagination
+		// is client-side, so a discarded tab loses the rows already walked with
+		// no way to ask for page three again. That reasoning does not reach a
+		// portal the operator never looks at - and taking over somebody's screen
+		// to show them a page they are not needed for is its own cost, paid
+		// every single fetch.
+		//
+		// The discard risk does not vanish, it is only smaller: a tab running
+		// script is not a discard candidate in practice, and this portal refetches
+		// each page from the server rather than holding it in the DOM, so a
+		// reload costs time instead of data.
+		const unattended = !!target.unattended;
+		const tab = await chrome.tabs.create({ url: target.url, active: !unattended });
 		portalTabId = tab.id;
 
-		const landed = await waitForFinesPage(portalTabId, SIGN_IN_WINDOW_MS, target);
+		if (unattended) {
+			progress(deskTabId, requestId, "opening", "Searching the portal - nothing to do here…");
+		}
+
+		const landed = await waitForFinesPage(
+			portalTabId,
+			unattended ? UNATTENDED_LANDING_MS : SIGN_IN_WINDOW_MS,
+			target
+		);
 		if (landed === "tab-closed") {
 			return { ok: false, message: "The fines tab was closed before anything was read." };
 		}
 		if (landed === "timeout") {
 			return {
 				ok: false,
-				message:
-					"The fines page never finished loading. Nothing was read - press Fetch Fines " +
-					"Now to try again.",
+				message: unattended
+					? "The portal did not load within 90 seconds, so nothing was read. This " +
+					  "needs no sign-in, so it is the site or the connection rather than " +
+					  "anything waiting on you - press the button again."
+					: "The fines page never finished loading. Nothing was read - press Fetch " +
+					  "Fines Now to try again.",
 			};
 		}
 

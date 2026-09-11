@@ -156,6 +156,23 @@ class FineFetcher:
 	# of whichever readers ship are granted in the manifest instead.
 	client_origin = None
 
+	# Whether a client fetch needs a person once it has started. False is the
+	# safe default and describes TAMM, which the extension was written for: the
+	# tab opens on a sign-in, somebody approves a push on their phone, and the
+	# read cannot begin until they have.
+	#
+	# True says the portal is a public form the reader can drive end to end - it
+	# fills the search itself and nobody looks at the tab. The extension uses
+	# this to decide two things it otherwise has to assume: whether to steal the
+	# operator's focus with a foreground tab, and how long to wait for the page
+	# before giving up. Waiting 45 minutes for a sign-in that is never coming is
+	# not harmless - it is a fetch that appears to hang.
+	#
+	# It is deliberately NOT the same as `supports_unattended`, which answers
+	# whether a SCHEDULER may run this portal with nobody in the building. A
+	# portal can need no interaction and still be unfit to run unwatched.
+	client_unattended = False
+
 	# Wall-clock budget for the fetching itself, in seconds; None is unbounded.
 	# The caller sets it, but the fetcher decides when to start the clock, so
 	# that waiting for a person to sign in never spends time meant for reading
