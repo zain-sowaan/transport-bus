@@ -11,6 +11,7 @@
   ],
   "host_permissions": [
     "http://localhost:8001/*",
+    "http://127.0.0.1:8001/*",
     "https://www.tamm.abudhabi/*",
     "https://ums.rta.ae/*"
   ],
@@ -20,7 +21,8 @@
   "content_scripts": [
     {
       "matches": [
-        "http://localhost:8001/*"
+        "http://localhost:8001/*",
+        "http://127.0.0.1:8001/*"
       ],
       "js": [
         "content/erp-bridge.js"

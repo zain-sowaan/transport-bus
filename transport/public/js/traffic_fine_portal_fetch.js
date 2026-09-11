@@ -68,9 +68,19 @@
 			frappe.msgprint({
 				title: __("Fine Fetch extension not found"),
 				indicator: "orange",
+				// The origin is named because it is the usual answer. The extension
+				// grants itself its desk addresses at build time, and a bench reached
+				// on a second name - 127.0.0.1 where the build says localhost, or the
+				// other way round - is a different origin to Chrome, so the bridge is
+				// never injected and this looks exactly like a missing install. Naming
+				// the address turns a dead end into something an operator can act on.
 				message: __(
-					"This browser does not have the Fine Fetch extension enabled, so there is " +
-						"nothing here that can open the portal. Install it, then reload this page."
+					"This browser has no Fine Fetch bridge on <b>{0}</b>, so there is nothing " +
+						"here that can open the portal.<br><br>Either the extension is not installed " +
+						"or enabled in this Chrome profile, or it was built for a different address " +
+						"than this one. Open the extension's options page, press Connect with exactly " +
+						"<b>{0}</b>, then reload this page.",
+					[window.location.origin]
 				),
 			});
 			return;
