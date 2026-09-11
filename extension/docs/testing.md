@@ -49,7 +49,24 @@ redis-server config/redis_queue.conf --daemonize yes
    operator edits the manifest **on their own machine** — the hostname is client
    infrastructure and this repository is public.
 2. `chrome://extensions` → **Developer mode** → **Load unpacked** → pick
-   `apps/transport/extension`.
+   `apps/transport/extension` **itself**, not a packaged copy of it.
+
+   This matters more than it looks. `tools/package.sh` produces a zip for
+   somebody else to load, and a zip is a *snapshot*: once it is unpacked
+   somewhere and loaded, nothing you change in the repository reaches Chrome
+   until you rebuild and replace it. A build made before a reader existed has
+   no reader, and the extension then refuses the portal by name - which reads
+   as a bug in the reader rather than as a stale build. Loading the repository
+   directory instead means a change needs only the reload arrow.
+
+   If you are testing a packaged build on purpose, rebuild it after every
+   change:
+
+   ```
+   extension/tools/package.sh --erp-origin http://127.0.0.1:8001 -o /tmp/tff.zip
+   ```
+
+   and check `content/readers/` in the result holds the reader you expect.
 3. Nothing to do in ERPNext. The desk script loads from `doctype_js`. If the
    button never appears, check that `bench build --app transport` has run and
    that `assets/transport/js/traffic_fine_portal_fetch.js` exists — and that no
