@@ -68,7 +68,26 @@
 	// indistinguishable from a fleet that owes nothing.
 	const EXPIRED_PATH = "session-expired";
 
+	// The search form is rendered by React AFTER document-complete - measured at
+	// roughly two seconds on a fast connection, and there is no reason to think
+	// that is a ceiling. This is the budget for it. It is generous on purpose:
+	// the cost of waiting is a few seconds, and the cost of not waiting is the
+	// reader reporting that the portal's markup has changed when the only thing
+	// wrong is that it had not finished drawing yet.
+	const FORM_GRACE_MS = 60000;
+
 	const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	/** Poll until `probe` returns something truthy, or give up. */
+	async function waitFor(probe, timeoutMs) {
+		const started = Date.now();
+		for (;;) {
+			const found = probe();
+			if (found) return found;
+			if (Date.now() - started >= timeoutMs) return null;
+			await sleep(POLL_MS);
+		}
+	}
 	const rowEls = () => [...document.querySelectorAll("div.finesRowList")];
 	const expired = () => location.pathname.includes(EXPIRED_PATH);
 
@@ -109,19 +128,37 @@
 		// Already on a results page - a re-injected reader after a navigation.
 		if (rowEls().length) return { state: "ready" };
 
+		// Wait for the app to draw its form before touching anything. The tab
+		// strip is the first thing to appear, so it is what says "React has
+		// rendered" - the previous version clicked at document-complete, found
+		// nothing there, and reported the markup as changed.
+		const strip = await waitFor(
+			() => document.querySelector("span.trafficCode"),
+			FORM_GRACE_MS
+		);
+		if (!strip) return { state: "no-form" };
+
 		selectTrafficCodeTab();
-		await sleep(600);
 
-		const input = document.querySelector(prefill.selector || "#Id_trafficFileNumber");
+		// The mode switch is a re-render, not a navigation, so this is short -
+		// but it is still a wait rather than an assumption.
+		const selector = prefill.selector || "#Id_trafficFileNumber";
+		const input = await waitFor(() => document.querySelector(selector), 15000);
 		if (!input) return { state: "no-form" };
-		setControlledValue(input, String(prefill.value));
-		await sleep(300);
 
-		// The Search button, found by its own label rather than by position.
-		// Explicitly NOT anything matching pay: #Id_PayNow lives on the results
-		// page and must never be reachable from here.
-		const search = [...document.querySelectorAll("button")].find(
-			(b) => /^\s*search\s*$/i.test(b.textContent || "") && !b.disabled
+		setControlledValue(input, String(prefill.value));
+
+		// The Search button, found by its own label rather than by position, and
+		// only once it is enabled - the form disables it until the field
+		// validates, so grabbing it too early finds a control that ignores the
+		// click. Explicitly NOT anything matching pay: #Id_PayNow lives on the
+		// results page and must never be reachable from here.
+		const search = await waitFor(
+			() =>
+				[...document.querySelectorAll("button")].find(
+					(b) => /^\s*search\s*$/i.test(b.textContent || "") && !b.disabled
+				),
+			10000
 		);
 		if (!search) return { state: "no-search-button" };
 		search.click();
