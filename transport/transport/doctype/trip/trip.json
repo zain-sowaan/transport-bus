@@ -1,8 +1,7 @@
 {
  "actions": [],
- "allow_rename": 0,
  "autoname": "TR-TRIP-.YYYY.-.MM.-.#####",
- "creation": "2026-08-05 12:00:00.000000",
+ "creation": "2026-08-05 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -26,6 +25,7 @@
   "column_break_timing",
   "actual_start_time",
   "actual_end_time",
+  "duration",
   "assignment_section",
   "vehicle",
   "vehicle_class",
@@ -136,11 +136,11 @@
    "reqd": 1
   },
   {
+   "collapsible": 1,
+   "description": "Optional. Use when a run collects from or drops at more than the two endpoints above. Leave empty for a simple point-to-point trip.",
    "fieldname": "stops_section",
    "fieldtype": "Section Break",
-   "label": "Stops",
-   "collapsible": 1,
-   "description": "Optional. Use when a run collects from or drops at more than the two endpoints above. Leave empty for a simple point-to-point trip."
+   "label": "Stops"
   },
   {
    "fieldname": "stops",
@@ -350,12 +350,18 @@
    "fieldtype": "Small Text",
    "label": "Driver Remarks",
    "read_only": 1
+  },
+  {
+   "fieldname": "duration",
+   "fieldtype": "Float",
+   "label": "Duration (hrs)",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-06 17:30:00.000000",
+ "modified": "2026-09-22 15:52:39.897662",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Trip",

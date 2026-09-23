@@ -29,3 +29,4 @@ transport.patches.retire_transport_traffic_fine
 transport.patches.backfill_fine_source_as_issuing_authority
 transport.patches.link_invoices_to_staged_fines
 transport.patches.point_darb_at_qmobility_and_key_its_fetcher
+transport.patches.backfill_trip_and_timesheet_hours

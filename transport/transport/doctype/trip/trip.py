@@ -20,6 +20,7 @@ PRE_START_STATUSES = ("Draft", "Assigned", "Accepted", "Rejected")
 class Trip(Document):
 	def validate(self):
 		self.clear_unstarted_actuals()
+		self.set_duration()
 		self.check_sales_order()
 		self.set_route_endpoints()
 		self.sync_stops_with_endpoints()
@@ -182,6 +183,9 @@ class Trip(Document):
 		# to the next day rather than silently subtracting from the day's total.
 		return hours + 24 if hours < 0 else hours
 
+	def set_duration(self):
+		self.duration = self.get_duration_hours()
+
 	def get_driver_hours_for_day(self):
 		"""Hours this driver has already worked on this date, excluding this
 		trip. Only counts legs that actually ran and were not rejected."""
@@ -234,8 +238,8 @@ class Trip(Document):
 		return frappe.db.get_single_value("Transport Settings", settings_field)
 
 
-def recalculate_duty_type(trip_name):
-	"""Re-evaluate Duty/OT once a trip's actual times exist. driver_portal's
+def recalculate_after_actuals(trip_name):
+	"""Re-evaluate Duty/OT once a trip's actual times exist and sets the duration of the trip. driver_portal's
 	start/end use db_set (deliberately - a driver must never trigger a full
 	save), which skips validate(), so hour-based OT would otherwise never be
 	applied to the trip that just finished."""
@@ -244,9 +248,11 @@ def recalculate_duty_type(trip_name):
 		return trip.duty_type
 
 	before = trip.duty_type
+	trip.set_duration()
 	trip.set_duty_type()
 	if trip.duty_type != before:
 		trip.db_set("duty_type", trip.duty_type)
+	trip.db_set("duration", trip.duration)
 	return trip.duty_type
 
 

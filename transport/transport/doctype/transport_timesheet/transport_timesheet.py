@@ -65,17 +65,22 @@ class TransportTimesheet(Document):
 		self.total_duty_trips = sum(1 for t in self.trips if t.duty_type == "Duty")
 		self.total_ot_trips = sum(1 for t in self.trips if t.duty_type == "OT")
 		self.total_additional_trips = sum(1 for t in self.trips if t.is_additional)
+		self.total_hours = sum(flt(t.duration) for t in self.trips)
 
 		# Both counts are kept because the charge basis is configurable: a rate
 		# quoted against a shift reads as per-day, but the client may confirm
 		# per-trip. Accounts can also see both before approving the invoice.
 		weekend_rows = [t for t in self.trips if t.holiday_type == WEEKEND]
 		holiday_rows = [t for t in self.trips if t.holiday_type == PUBLIC_HOLIDAY]
-
+		
 		self.total_weekend_trips = len(weekend_rows)
 		self.total_public_holiday_trips = len(holiday_rows)
 		self.total_weekend_days = len({t.trip_date for t in weekend_rows})
 		self.total_public_holiday_days = len({t.trip_date for t in holiday_rows})
+		self.total_weekend_hours = sum(flt(t.duration) for t in weekend_rows)
+		self.total_public_holiday_hours = sum(flt(t.duration) for t in holiday_rows)
+		self.total_duty_hours = sum(flt(t.duration) for t in self.trips if t.duty_type == "Duty")
+		self.total_ot_hours = sum(flt(t.duration) for t in self.trips if t.duty_type == "OT")
 
 	def on_trash(self):
 		if self.status != "Draft":
@@ -112,7 +117,7 @@ class TransportTimesheet(Document):
 				"timesheet": ("in", ("", None)),
 			},
 			fields=[
-				"name", "trip_date", "route", "direction", "driver", "vehicle",
+				"name", "trip_date", "route", "direction", "driver", "vehicle", "duration",
 				"scheduled_time", "actual_start_time", "actual_end_time", "duty_type", "is_additional",
 			],
 			order_by="trip_date, scheduled_time",
@@ -135,6 +140,7 @@ class TransportTimesheet(Document):
 				"is_additional": trip.is_additional,
 				"is_holiday": bool(holiday_kind),
 				"holiday_type": holiday_kind,
+				"duration": trip.duration,
 			})
 
 		self.save()

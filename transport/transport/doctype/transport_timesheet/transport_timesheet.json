@@ -1,8 +1,7 @@
 {
  "actions": [],
- "allow_rename": 0,
  "autoname": "TR-TSH-.YYYY.-.MM.-.#####",
- "creation": "2026-08-05 16:00:00.000000",
+ "creation": "2026-08-05 16:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -19,15 +18,20 @@
   "totals_section",
   "total_trips",
   "total_duty_trips",
+  "total_duty_hours",
   "column_break_totals",
   "total_ot_trips",
+  "total_ot_hours",
   "total_additional_trips",
+  "total_hours",
   "holiday_totals_section",
   "total_weekend_days",
   "total_weekend_trips",
+  "total_weekend_hours",
   "column_break_holiday",
   "total_public_holiday_days",
   "total_public_holiday_trips",
+  "total_public_holiday_hours",
   "operations_section",
   "operations_approved_by",
   "operations_approved_on",
@@ -244,14 +248,45 @@
    "fieldtype": "Int",
    "label": "Public Holiday Trips",
    "read_only": 1
+  },
+  {
+   "fieldname": "total_hours",
+   "fieldtype": "Float",
+   "label": "Total Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_weekend_hours",
+   "fieldtype": "Float",
+   "label": "Total Weekend Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_ot_hours",
+   "fieldtype": "Float",
+   "label": "Total OT Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_public_holiday_hours",
+   "fieldtype": "Float",
+   "label": "Total Public Holiday Hours",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_duty_hours",
+   "fieldtype": "Float",
+   "label": "Total Duty Hours",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-06 17:30:00.000000",
+ "modified": "2026-09-22 21:16:54.024413",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Timesheet",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -288,6 +323,7 @@
    "role": "Transport Accounts"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
