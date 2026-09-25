@@ -158,8 +158,7 @@ class Trip(Document):
 		vehicle's.
 
 		A trip's hours are only knowable once it has actually run, so an
-		unexecuted trip stays Duty and is re-evaluated when the driver ends it
-		(see recalculate_duty_type, called from driver_portal.end_trip)."""
+		unexecuted trip stays Duty and is re-evaluated when the driver ends it"""
 		duration = self.get_duration_hours()
 		if not (self.driver and duration):
 			self.duty_type = "Duty"

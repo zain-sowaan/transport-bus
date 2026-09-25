@@ -128,10 +128,10 @@ doctype_js = {"Traffic Fine Portal": "public/js/traffic_fine_portal_fetch.js"}
 # home_page = "login"
 
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
-
+role_home_page = {
+	"Transport Driver": "/driver",
+	"Customer": "/customer",
+}
 # Generators
 # ----------
 

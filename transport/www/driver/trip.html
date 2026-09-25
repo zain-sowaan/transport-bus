@@ -111,7 +111,7 @@ frappe.ready(function() {
 			var accept = button("Accept Trip", "btn-primary");
 			var reject = button("Reject Trip", "btn-danger");
 			accept.onclick = function() {
-				callMethod("accept_trip", { trip_name: tripName }).then(reload);
+				callMethod("accept_trip", { trip_name: tripName }).then(setTimeout(reload, 1500));
 			};
 			reject.onclick = function() {
 				var reason = prompt("Reason for rejecting this trip:");
@@ -219,6 +219,7 @@ frappe.ready(function() {
 			.then(function() {
 				msg.className = "msg-ok";
 				msg.textContent = "Expense submitted for approval.";
+				setTimeout(reload, 2000);
 			})
 			.catch(function(e) {
 				msg.className = "msg-error";

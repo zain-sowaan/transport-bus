@@ -17,7 +17,7 @@ ACCOUNTS_ROLES = ("Transport Accounts", "System Manager")
 
 class TripExpense(Document):
 	def validate(self):
-		if self.amount and self.amount <= 0:
+		if self.amount and int(self.amount) <= 0:
 			frappe.throw(_("Amount must be greater than zero."))
 		self.check_duplicate_receipt()
 
