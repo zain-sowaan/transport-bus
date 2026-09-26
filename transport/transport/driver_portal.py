@@ -19,9 +19,21 @@ import math
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, now_datetime, nowdate, nowtime
+from frappe.utils import flt, get_datetime, get_time, getdate, now_datetime, nowdate, nowtime
 
 MANAGING_ROLES = ("System Manager", "Transport Operations", "Transport In-Charge")
+
+# Mirrors Trip Expense.expense_type options - checked server-side so a
+# hand-crafted request can't store a value the desk Select would reject.
+EXPENSE_TYPES = ("Fuel", "Salik / Toll", "Parking", "Maintenance", "Others")
+# A driver can log costs once they've committed to the trip (fuel is often
+# bought before starting) and until it's closed; not on a trip they rejected
+# or that was cancelled, which would leave an expense with no real journey.
+EXPENSE_OPEN_STATUSES = ("Accepted", "Started", "Completed", "Approved")
+EXPENSE_FIELDS = [
+	"name", "trip", "expense_date", "expense_type", "amount", "attachment",
+	"remarks", "status", "creation",
+]
 
 
 # --------------------------------------------------------------------------
@@ -189,8 +201,24 @@ def end_trip(trip_name, drop_photo, end_odometer=None, driver_remarks=None):
 
 
 @frappe.whitelist()
-def log_expense(trip_name, expense_type, amount, attachment, remarks=None):
+def log_expense(trip_name, expense_type, amount, attachment=None, remarks=None):
 	trip = _get_my_trip(trip_name)
+	if trip.status not in EXPENSE_OPEN_STATUSES:
+		frappe.throw(_("Expenses can't be logged on a {0} trip.").format(_(trip.status)))
+	if expense_type not in EXPENSE_TYPES:
+		frappe.throw(_("Choose a valid expense type."))
+
+	# Form posts arrive as strings - cast here so nothing downstream has to.
+	amount = flt(amount, 2)
+	if amount <= 0:
+		frappe.throw(_("Enter an amount greater than zero."))
+	if not attachment:
+		frappe.throw(_("A receipt photo is required."))
+	# Only accept a file this driver uploaded, so the endpoint can't be used
+	# to link someone else's private file to an expense.
+	if not frappe.db.exists("File", {"file_url": attachment, "owner": frappe.session.user}):
+		frappe.throw(_("Receipt upload not found. Please attach the photo again."))
+
 	expense = frappe.get_doc(
 		{
 			"doctype": "Trip Expense",
@@ -198,11 +226,79 @@ def log_expense(trip_name, expense_type, amount, attachment, remarks=None):
 			"expense_type": expense_type,
 			"amount": amount,
 			"attachment": attachment,
-			"remarks": remarks,
+			"remarks": (remarks or "").strip() or None,
 		}
 	)
 	expense.insert(ignore_permissions=True)
-	return expense.name
+	return _expense_row(expense.as_dict())
+
+
+@frappe.whitelist()
+def get_trip_expenses(trip_name):
+	trip = _get_my_trip(trip_name)
+	return list_trip_expenses(trip.name)
+
+
+def list_trip_expenses(trip_name):
+	rows = frappe.get_all(
+		"Trip Expense",
+		filters={"trip": trip_name},
+		fields=EXPENSE_FIELDS,
+		order_by="creation desc",
+	)
+	return [_expense_row(r) for r in rows]
+
+
+def _expense_row(row):
+	return {
+		"name": row.get("name"),
+		"expense_type": row.get("expense_type"),
+		"amount": flt(row.get("amount")),
+		"amount_label": format_amount(row.get("amount")),
+		"expense_date": format_day(row.get("expense_date")),
+		"status": row.get("status") or "Pending",
+		"remarks": row.get("remarks") or "",
+		"attachment": row.get("attachment") or "",
+	}
+
+
+# --------------------------------------------------------------------------
+# Display helpers (shared by the /driver pages)
+# --------------------------------------------------------------------------
+
+def format_time_short(value):
+	"""'6:42:38.123' -> '06:42'. Trip times are stored with seconds and
+	microseconds, which is noise on a phone screen."""
+	if not value:
+		return ""
+	try:
+		return get_time(value).strftime("%H:%M")
+	except Exception:
+		return str(value)
+
+
+def format_day(value):
+	if not value:
+		return ""
+	date = getdate(value)
+	today = getdate(nowdate())
+	delta = (date - today).days
+	if delta == 0:
+		return _("Today")
+	if delta == 1:
+		return _("Tomorrow")
+	if delta == -1:
+		return _("Yesterday")
+	return date.strftime("%a, %d %b %Y" if date.year != today.year else "%a, %d %b")
+
+
+def format_amount(value):
+	currency = frappe.defaults.get_global_default("currency")
+	return frappe.utils.fmt_money(flt(value), currency=currency)
+
+
+def status_slug(status):
+	return (status or "").lower().replace(" ", "-")
 
 
 # --------------------------------------------------------------------------

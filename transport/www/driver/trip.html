@@ -1,139 +1,381 @@
 {% extends "templates/web.html" %}
 
 {% block page_content %}
-<div class="driver-app">
+{% include "templates/includes/driver_portal_styles.html" %}
+<div class="drv">
 	{% if error %}
-		<p class="text-muted">{{ error }}</p>
+		<a href="/driver" class="drv-back">&larr; {{ _("My Trips") }}</a>
+		<div class="drv-empty">{{ error }}</div>
 	{% else %}
-		<a href="/driver" class="back-link">&larr; My Trips</a>
-		<h2>{{ trip.from_place }} &rarr; {{ trip.to_place }}</h2>
-		<p class="trip-meta">
-			{{ frappe.utils.formatdate(trip.trip_date) }} &middot; {{ trip.scheduled_time }} &middot; {{ trip.direction }}
-			{% if trip.vehicle %} &middot; {{ trip.vehicle }}{% endif %}
-		</p>
-		<p class="trip-status">Status: <b id="trip-status">{{ trip.status }}</b></p>
-		{% if trip.rejection_reason %}<p class="text-muted">Rejected: {{ trip.rejection_reason }}</p>{% endif %}
+	<a href="/driver" class="drv-back">&larr; {{ _("My Trips") }}</a>
 
-		<div id="action-area" data-trip="{{ trip.name }}" data-status="{{ trip.status }}"></div>
-
-		<div id="expense-area">
-			<h3>Log an Expense</h3>
-			<div class="field"><label>Type</label>
-				<select id="expense-type">
-					<option>Fuel</option><option>Salik / Toll</option><option>Parking</option>
-					<option>Maintenance</option><option>Others</option>
-				</select>
-			</div>
-			<div class="field"><label>Amount</label><input type="number" id="expense-amount" min="0" step="0.01"></div>
-			<div class="field"><label>Receipt Photo</label><input type="file" id="expense-photo" accept="image/*" capture="environment"></div>
-			<div class="field"><label>Remarks</label><input type="text" id="expense-remarks"></div>
-			<button class="btn btn-default" id="log-expense-btn">Submit Expense</button>
-			<p id="expense-message" class="text-muted"></p>
+	<!-- Header -->
+	<div class="drv-card trip-head">
+		<div class="drv-card-head">
+			<span class="muted small">{{ trip.day_label }} &middot; {{ trip.time_label or "--:--" }}</span>
+			<span class="pill pill-{{ trip.status_slug }}" id="trip-status">{{ _(trip.status) }}</span>
 		</div>
+		<h2 class="trip-title">{{ trip.from_place or "?" }} <span class="muted">&rarr;</span> {{ trip.to_place or "?" }}</h2>
+		<div class="drv-trip-meta" style="margin-top:6px">
+			<span>{{ trip.name }}</span>
+			{% if trip.direction %}<span>{{ _(trip.direction) }}</span>{% endif %}
+			{% if trip.duty_type == "OT" %}<span class="pill pill-ot">OT</span>{% endif %}
+			{% if trip.is_additional %}<span class="pill">{{ _("Additional") }}</span>{% endif %}
+		</div>
+
+		{% if steps %}
+		<ol class="steps">
+			{% for s in steps %}<li class="{{ s.state }}"><i></i><span>{{ s.label }}</span></li>{% endfor %}
+		</ol>
+		{% endif %}
+	</div>
+
+	{% if trip.needs_reallocation and trip.status not in ("Rejected", "Cancelled") %}
+		<div class="drv-msg show info">{{ _("Operations may reassign this trip. Accept it now if you can take it.") }}</div>
+	{% endif %}
+	{% if trip.rejection_reason %}
+		<div class="drv-msg show error"><b>{{ _("Rejected:") }}</b> {{ trip.rejection_reason }}</div>
+	{% endif %}
+	{% if trip.remarks %}
+		<div class="drv-card note"><h3>{{ _("Note from Operations") }}</h3><div class="pre">{{ trip.remarks }}</div></div>
+	{% endif %}
+
+	<!-- Actions (rendered by JS for the current status) -->
+	<div class="drv-card" id="action-card">
+		<div id="action-area" data-trip="{{ trip.name }}" data-status="{{ trip.status }}"></div>
+		<div class="drv-msg" id="action-message" role="alert"></div>
+	</div>
+
+	<!-- Trip details -->
+	<div class="drv-card">
+		<h3>{{ _("Trip details") }}</h3>
+		<div class="kv">
+			<div><span>{{ _("Date") }}</span><b>{{ trip.date_label }}</b></div>
+			<div><span>{{ _("Scheduled") }}</span><b>{{ trip.time_label or "-" }}</b></div>
+			<div><span>{{ _("Vehicle") }}</span><b>{{ trip.vehicle or "-" }}{% if trip.vehicle_class %} <small class="muted">({{ trip.vehicle_class }})</small>{% endif %}</b></div>
+			<div><span>{{ _("Duty type") }}</span><b>{{ _(trip.duty_type) if trip.duty_type else "-" }}</b></div>
+			<div class="full"><span>{{ _("Route") }}</span><b>{{ trip.route_name or trip.route or "-" }}</b></div>
+			<div class="full"><span>{{ _("Project") }}</span><b>{{ trip.project_name or trip.project or "-" }}</b></div>
+			{% if trip.customer %}<div class="full"><span>{{ _("Customer") }}</span><b>{{ trip.customer }}</b></div>{% endif %}
+		</div>
+	</div>
+
+	{% if stops %}
+	<div class="drv-card">
+		<h3>{{ _("Stops") }} <span class="muted small">({{ stops | length }})</span></h3>
+		<ol class="stops">
+			{% for stop in stops %}
+			<li>
+				<div class="stop-main">
+					<b>{{ stop.place or "-" }}</b>
+					<span class="muted small">{{ _(stop.stop_type) if stop.stop_type else "" }}{% if stop.no_of_passengers %} &middot; {{ stop.no_of_passengers }} {{ _("pax") }}{% endif %}</span>
+					{% if stop.remarks %}<div class="muted small">{{ stop.remarks }}</div>{% endif %}
+				</div>
+				<span class="stop-time">{{ stop.time_label or "" }}</span>
+			</li>
+			{% endfor %}
+		</ol>
+	</div>
+	{% endif %}
+
+	{% if trip.start_label or trip.end_label %}
+	<div class="drv-card">
+		<h3>{{ _("Trip log") }}</h3>
+		<div class="kv">
+			<div><span>{{ _("Started") }}</span><b>{{ trip.start_label or "-" }}</b></div>
+			<div><span>{{ _("Ended") }}</span><b>{{ trip.end_label or "-" }}</b></div>
+			<div><span>{{ _("Start odometer") }}</span><b>{{ "{:,.0f}".format(trip.start_odometer) if trip.start_odometer else "-" }}</b></div>
+			<div><span>{{ _("End odometer") }}</span><b>{{ "{:,.0f}".format(trip.end_odometer) if trip.end_odometer else "-" }}</b></div>
+			<div><span>{{ _("Distance") }}</span><b>{{ (trip.km ~ " km") if trip.km else "-" }}</b></div>
+			<div><span>{{ _("Duration") }}</span><b>{{ ("%.1f h" % trip.duration) if trip.duration else "-" }}</b></div>
+			{% if trip.driver_remarks %}<div class="full"><span>{{ _("Your remarks") }}</span><b>{{ trip.driver_remarks }}</b></div>{% endif %}
+			{% if trip.approved_label %}<div class="full"><span>{{ _("Approved on") }}</span><b>{{ trip.approved_label }}</b></div>{% endif %}
+		</div>
+		{% if trip.vehicle_photo or trip.drop_photo %}
+		<div class="photos">
+			{% if trip.vehicle_photo %}<a href="{{ trip.vehicle_photo }}" target="_blank" rel="noopener"><img src="{{ trip.vehicle_photo }}" alt="{{ _('Vehicle photo') }}" loading="lazy"><span>{{ _("Start") }}</span></a>{% endif %}
+			{% if trip.drop_photo %}<a href="{{ trip.drop_photo }}" target="_blank" rel="noopener"><img src="{{ trip.drop_photo }}" alt="{{ _('Drop photo') }}" loading="lazy"><span>{{ _("Drop") }}</span></a>{% endif %}
+		</div>
+		{% endif %}
+	</div>
+	{% endif %}
+
+	<!-- Expenses -->
+	<div class="drv-card" id="expense-card"
+		data-expenses='{{ expenses_json | e }}'
+		data-currency="{{ currency }}">
+		<div class="drv-card-head">
+			<h3>{{ _("Expenses") }}</h3>
+			<span class="muted small" id="expense-total"></span>
+		</div>
+		<div id="expense-list"></div>
+
+		{% if can_log_expense %}
+		<button class="btn btn-default btn-block" id="expense-toggle" type="button">+ {{ _("Add expense") }}</button>
+		<form id="expense-form" class="expense-form" novalidate hidden>
+			<div class="row2">
+				<div class="field"><label for="expense-type">{{ _("Type") }} <span class="req">*</span></label>
+					<select id="expense-type">
+						{% for t in expense_types %}<option value="{{ t }}">{{ _(t) }}</option>{% endfor %}
+					</select>
+				</div>
+				<div class="field"><label for="expense-amount">{{ _("Amount") }}{% if currency %} ({{ currency }}){% endif %} <span class="req">*</span></label>
+					<input type="number" id="expense-amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00">
+				</div>
+			</div>
+			<div class="field"><label for="expense-photo">{{ _("Receipt photo") }} <span class="req">*</span></label>
+				<input type="file" id="expense-photo" accept="image/*" capture="environment">
+				<img id="expense-preview" class="preview" alt="" hidden>
+			</div>
+			<div class="field"><label for="expense-remarks">{{ _("Remarks") }}</label>
+				<input type="text" id="expense-remarks" maxlength="140" placeholder="{{ _('e.g. ADNOC Mafraq, full tank') }}">
+			</div>
+			<div class="btn-row">
+				<button class="btn btn-default" id="expense-cancel" type="button">{{ _("Cancel") }}</button>
+				<button class="btn btn-primary" id="log-expense-btn" type="submit">{{ _("Submit expense") }}</button>
+			</div>
+		</form>
+		{% else %}
+		<p class="muted small" style="margin:8px 0 0">{{ _("Expenses can be added once the trip is accepted.") if trip.status in ("Draft", "Assigned") else _("Expenses can't be added to this trip.") }}</p>
+		{% endif %}
+		<div class="drv-msg" id="expense-message" role="alert"></div>
+	</div>
 	{% endif %}
 </div>
 
 <style>
-	.driver-app { max-width: 480px; margin: 0 auto; padding: 12px; }
-	.back-link { display: inline-block; margin-bottom: 10px; }
-	.trip-meta, .trip-status { color: #6c7680; margin: 4px 0; }
-	.field { margin-bottom: 10px; }
-	.field label { display: block; font-size: 12px; color: #6c7680; margin-bottom: 3px; }
-	.field input, .field select { width: 100%; padding: 8px; border: 1px solid #d1d8dd; border-radius: 6px; }
-	.btn { display: inline-block; padding: 10px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; margin: 4px 4px 4px 0; }
-	.btn-primary { background: #2e7d32; color: #fff; }
-	.btn-danger { background: #c62828; color: #fff; }
-	.btn-info { background: #1976d2; color: #fff; }
-	.btn-default { background: #eceff1; color: #333; }
-	#action-area { margin: 16px 0; }
-	#expense-area { margin-top: 24px; border-top: 1px solid #d1d8dd; padding-top: 16px; }
-	.msg-error { color: #c62828; }
-	.msg-ok { color: #2e7d32; }
+	.trip-title { font-size: 21px; line-height: 1.25; }
+	.steps { list-style: none; display: flex; padding: 0; margin: 14px 0 2px; }
+	.steps li { flex: 1; position: relative; text-align: center; font-size: 11px; color: var(--drv-muted); }
+	.steps li i { display: block; width: 12px; height: 12px; margin: 0 auto 4px; border-radius: 50%; background: #d7dde2; position: relative; z-index: 1; }
+	.steps li:not(:first-child)::before { content: ""; position: absolute; top: 5px; right: 50%; width: 100%; height: 2px; background: #d7dde2; }
+	.steps li.done i, .steps li.done::before, .steps li.current::before { background: var(--drv-green); }
+	.steps li.current i { background: #fff; border: 3px solid var(--drv-green); }
+	.steps li.current span { color: var(--drv-text); font-weight: 650; }
+	.note { background: #fffaf0; border-color: #f3dfb5; }
+	.note h3 { margin-bottom: 4px; }
+	.pre { white-space: pre-wrap; }
+	.stops { list-style: none; padding: 0; margin: 0; }
+	.stops li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--drv-border); }
+	.stops li:first-child { border-top: none; padding-top: 0; }
+	.stop-main span { display: block; }
+	.stop-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+	.photos { display: flex; gap: 10px; margin-top: 12px; }
+	.photos a { flex: 1; text-decoration: none; text-align: center; font-size: 12px; color: var(--drv-muted); }
+	.photos img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid var(--drv-border); display: block; margin-bottom: 4px; background: #f0f2f4; }
+	.expense-form { margin-top: 12px; border-top: 1px solid var(--drv-border); padding-top: 12px; }
+	.preview { display: block; max-height: 140px; margin-top: 8px; border-radius: 8px; border: 1px solid var(--drv-border); }
+	.exp { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--drv-border); }
+	.exp:first-child { border-top: none; padding-top: 0; }
+	.exp-main b { display: block; }
+	.exp-main .muted { font-size: 12.5px; }
+	.exp-side { text-align: right; }
+	.exp-side b { display: block; font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+	.exp-empty { color: var(--drv-muted); font-size: 14px; margin: 0 0 12px; }
+	.exp.flash { animation: flash 1.6s ease-out; }
+	@keyframes flash { from { background: #e6f4ea; } to { background: transparent; } }
+	.reject-box { margin-top: 10px; }
 </style>
 
 <script>
-frappe.ready(function() {
+frappe.ready(function () {
 	var actionArea = document.getElementById("action-area");
 	if (!actionArea) return;
 
 	var tripName = actionArea.dataset.trip;
 	var status = actionArea.dataset.status;
+	var METHOD = "transport.transport.driver_portal.";
+
+	// ------------------------------------------------------------------
+	// Helpers
+	// ------------------------------------------------------------------
+
+	function esc(s) {
+		var d = document.createElement("div");
+		d.textContent = s == null ? "" : String(s);
+		return d.innerHTML;
+	}
+
+	function stripTags(html) {
+		var d = document.createElement("div");
+		d.innerHTML = html;
+		return (d.textContent || "").trim();
+	}
+
+	// Turn a Frappe error response into one readable sentence. The old page
+	// passed `r._server_messages` (a JSON string of JSON strings) straight to
+	// the screen, or showed nothing at all when the server crashed.
+	function errorText(data, fallback) {
+		var parts = [];
+		try {
+			if (data && data._server_messages) {
+				JSON.parse(data._server_messages).forEach(function (m) {
+					try { m = JSON.parse(m).message || m; } catch (e) { /* plain string */ }
+					parts.push(stripTags(m));
+				});
+			}
+		} catch (e) { /* ignore */ }
+		if (!parts.length && data && data.exception) {
+			parts.push(__("Server error. Please try again, or tell Operations.") + " (" + String(data.exception).split(":")[0] + ")");
+		}
+		if (!parts.length && data && typeof data.message === "string") parts.push(stripTags(data.message));
+		return parts.join(" ") || fallback || __("Something went wrong. Please try again.");
+	}
+
+	function api(method, args) {
+		var body = new URLSearchParams();
+		Object.keys(args || {}).forEach(function (k) {
+			if (args[k] !== null && args[k] !== undefined) body.append(k, args[k]);
+		});
+		return fetch("/api/method/" + METHOD + method, {
+			method: "POST",
+			headers: {
+				"X-Frappe-CSRF-Token": frappe.csrf_token,
+				"Accept": "application/json",
+				"Content-Type": "application/x-www-form-urlencoded",
+			},
+			credentials: "include",
+			body: body,
+		})
+			.catch(function () { throw __("No connection. Check your internet and try again."); })
+			.then(function (r) {
+				return r.json().catch(function () { return {}; }).then(function (data) {
+					if (!r.ok || data.exc || data.exception) throw errorText(data);
+					return data.message;
+				});
+			});
+	}
+
+	// Phone cameras produce 4-10 MB photos; shrink big ones before upload so
+	// they don't fail on a weak connection or hit the site's size limit.
+	function shrinkImage(file) {
+		return new Promise(function (resolve) {
+			if (!file.type || file.type.indexOf("image/") !== 0 || file.size < 1.5 * 1024 * 1024 || !window.createImageBitmap) {
+				resolve(file); return;
+			}
+			createImageBitmap(file).then(function (bmp) {
+				var max = 1600, scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+				var canvas = document.createElement("canvas");
+				canvas.width = Math.round(bmp.width * scale);
+				canvas.height = Math.round(bmp.height * scale);
+				canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+				canvas.toBlob(function (blob) {
+					if (!blob) { resolve(file); return; }
+					resolve(new File([blob], (file.name || "photo").replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }));
+				}, "image/jpeg", 0.82);
+			}).catch(function () { resolve(file); });
+		});
+	}
 
 	function uploadFile(fileInput) {
-		return new Promise(function(resolve, reject) {
-			if (!fileInput.files.length) { reject("No file selected"); return; }
+		if (!fileInput || !fileInput.files.length) return Promise.reject(__("Please take or choose a photo."));
+		return shrinkImage(fileInput.files[0]).then(function (file) {
 			var formData = new FormData();
-			formData.append("file", fileInput.files[0]);
+			formData.append("file", file, file.name);
 			formData.append("is_private", 1);
-			fetch("/api/method/upload_file", {
+			return fetch("/api/method/upload_file", {
 				method: "POST",
-				headers: { "X-Frappe-CSRF-Token": frappe.csrf_token },
+				headers: { "X-Frappe-CSRF-Token": frappe.csrf_token, "Accept": "application/json" },
 				body: formData,
 				credentials: "include",
 			})
-				.then(function(r) { return r.json(); })
-				.then(function(data) {
-					if (data.message && data.message.file_url) resolve(data.message.file_url);
-					else reject("Upload failed");
-				})
-				.catch(reject);
+				.catch(function () { throw __("Photo upload failed - no connection."); })
+				.then(function (r) {
+					return r.json().catch(function () { return {}; }).then(function (data) {
+						if (r.ok && data.message && data.message.file_url) return data.message.file_url;
+						throw errorText(data, __("Photo upload failed. Please try again."));
+					});
+				});
 		});
 	}
 
 	function getPosition() {
-		return new Promise(function(resolve, reject) {
-			if (!navigator.geolocation) { reject("Geolocation is not available on this device."); return; }
+		return new Promise(function (resolve, reject) {
+			if (!navigator.geolocation) { reject(__("Location is not available on this device.")); return; }
 			navigator.geolocation.getCurrentPosition(
-				function(pos) { resolve(pos.coords); },
-				function() { reject("Could not get your location. Enable location access and try again."); },
+				function (pos) { resolve(pos.coords); },
+				function () { reject(__("Could not get your location. Turn on location access and try again.")); },
 				{ enableHighAccuracy: true, timeout: 15000 }
 			);
 		});
 	}
 
-	function callMethod(method, args) {
-		return new Promise(function(resolve, reject) {
-			frappe.call({
-				method: "transport.transport.driver_portal." + method,
-				args: args,
-				callback: function(r) { resolve(r.message); },
-				error: function(r) { reject((r && r._server_messages) || "Something went wrong."); },
-			});
-		});
+	function showMsg(el, kind, text) {
+		el.className = "drv-msg show " + kind;
+		el.textContent = text;
+	}
+	function hideMsg(el) { el.className = "drv-msg"; el.textContent = ""; }
+
+	function busy(btn, on, label) {
+		if (on) { btn.dataset.label = btn.textContent; btn.textContent = label || __("Please wait..."); btn.disabled = true; }
+		else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; }
+	}
+
+	function el(html) {
+		var t = document.createElement("template");
+		t.innerHTML = html.trim();
+		return t.content.firstChild;
 	}
 
 	function reload() { window.location.reload(); }
 
-	function render() {
+	// ------------------------------------------------------------------
+	// Trip actions
+	// ------------------------------------------------------------------
+
+	var actionMsg = document.getElementById("action-message");
+
+	function renderActions() {
 		actionArea.innerHTML = "";
 
 		if (status === "Assigned") {
-			var accept = button("Accept Trip", "btn-primary");
-			var reject = button("Reject Trip", "btn-danger");
-			accept.onclick = function() {
-				callMethod("accept_trip", { trip_name: tripName }).then(setTimeout(reload, 1500));
+			actionArea.appendChild(el('<h3>' + __("New trip for you") + '</h3>'));
+			var row = el('<div class="btn-row"></div>');
+			var accept = el('<button class="btn btn-primary" type="button">' + __("Accept trip") + '</button>');
+			var reject = el('<button class="btn btn-danger" type="button">' + __("Reject") + '</button>');
+			row.appendChild(reject); row.appendChild(accept);
+			actionArea.appendChild(row);
+
+			var box = el('<div class="reject-box" hidden>' +
+				'<div class="field"><label for="reject-reason">' + __("Why can't you take this trip?") + ' <span class="req">*</span></label>' +
+				'<textarea id="reject-reason" rows="2"></textarea></div>' +
+				'<button class="btn btn-danger btn-block" type="button" id="reject-confirm">' + __("Confirm rejection") + '</button></div>');
+			actionArea.appendChild(box);
+
+			accept.onclick = function () {
+				hideMsg(actionMsg); busy(accept, true, __("Accepting..."));
+				api("accept_trip", { trip_name: tripName }).then(reload)
+					.catch(function (e) { busy(accept, false); showMsg(actionMsg, "error", e); });
 			};
-			reject.onclick = function() {
-				var reason = prompt("Reason for rejecting this trip:");
-				if (reason) callMethod("reject_trip", { trip_name: tripName, reason: reason }).then(reload);
+			reject.onclick = function () { box.hidden = !box.hidden; if (!box.hidden) box.querySelector("textarea").focus(); };
+			box.querySelector("#reject-confirm").onclick = function () {
+				var btn = this, reason = box.querySelector("textarea").value.trim();
+				if (!reason) { showMsg(actionMsg, "error", __("Please give a reason.")); return; }
+				hideMsg(actionMsg); busy(btn, true);
+				api("reject_trip", { trip_name: tripName, reason: reason }).then(reload)
+					.catch(function (e) { busy(btn, false); showMsg(actionMsg, "error", e); });
 			};
-			actionArea.appendChild(accept);
-			actionArea.appendChild(reject);
+
 		} else if (status === "Accepted") {
-			var photoLabel = document.createElement("div");
-			photoLabel.className = "field";
-			photoLabel.innerHTML = '<label>Vehicle Photo</label><input type="file" id="start-photo" accept="image/*" capture="environment">';
-			var odoLabel = document.createElement("div");
-			odoLabel.className = "field";
-			odoLabel.innerHTML = '<label>Start Odometer (KM)</label><input type="number" id="start-odo">';
-			var start = button("Start Trip", "btn-info");
-			start.onclick = function() {
-				var photoInput = document.getElementById("start-photo");
-				start.disabled = true;
+			actionArea.appendChild(el('<h3>' + __("Start the trip") + '</h3>'));
+			actionArea.appendChild(el('<div class="field"><label for="start-photo">' + __("Vehicle photo") + ' <span class="req">*</span></label>' +
+				'<input type="file" id="start-photo" accept="image/*" capture="environment"></div>'));
+			actionArea.appendChild(el('<div class="field"><label for="start-odo">' + __("Start odometer (km)") + '</label>' +
+				'<input type="number" id="start-odo" inputmode="numeric" min="0"></div>'));
+			actionArea.appendChild(el('<p class="muted small" style="margin:0 0 10px">' + __("Your location is checked against the pickup point when you start.") + '</p>'));
+			var start = el('<button class="btn btn-info btn-block" type="button">' + __("Start trip") + '</button>');
+			actionArea.appendChild(start);
+
+			start.onclick = function () {
+				var photo = document.getElementById("start-photo");
+				if (!photo.files.length) { showMsg(actionMsg, "error", __("A vehicle photo is required to start.")); return; }
+				hideMsg(actionMsg); busy(start, true, __("Getting location..."));
 				getPosition()
-					.then(function(coords) {
-						return uploadFile(photoInput).then(function(fileUrl) {
-							return callMethod("start_trip", {
+					.then(function (coords) {
+						start.textContent = __("Uploading photo...");
+						return uploadFile(photo).then(function (fileUrl) {
+							start.textContent = __("Starting...");
+							return api("start_trip", {
 								trip_name: tripName,
 								latitude: coords.latitude,
 								longitude: coords.longitude,
@@ -143,28 +385,28 @@ frappe.ready(function() {
 						});
 					})
 					.then(reload)
-					.catch(function(e) { alert(e); start.disabled = false; });
+					.catch(function (e) { busy(start, false); showMsg(actionMsg, "error", e); });
 			};
-			actionArea.appendChild(photoLabel);
-			actionArea.appendChild(odoLabel);
-			actionArea.appendChild(start);
+
 		} else if (status === "Started") {
-			var dropLabel = document.createElement("div");
-			dropLabel.className = "field";
-			dropLabel.innerHTML = '<label>Drop Location Photo</label><input type="file" id="end-photo" accept="image/*" capture="environment">';
-			var endOdoLabel = document.createElement("div");
-			endOdoLabel.className = "field";
-			endOdoLabel.innerHTML = '<label>End Odometer (KM)</label><input type="number" id="end-odo">';
-			var remarksLabel = document.createElement("div");
-			remarksLabel.className = "field";
-			remarksLabel.innerHTML = '<label>Remarks</label><input type="text" id="end-remarks">';
-			var end = button("End Trip", "btn-primary");
-			end.onclick = function() {
-				var photoInput = document.getElementById("end-photo");
-				end.disabled = true;
-				uploadFile(photoInput)
-					.then(function(fileUrl) {
-						return callMethod("end_trip", {
+			actionArea.appendChild(el('<h3>' + __("End the trip") + '</h3>'));
+			actionArea.appendChild(el('<div class="field"><label for="end-photo">' + __("Drop location photo") + ' <span class="req">*</span></label>' +
+				'<input type="file" id="end-photo" accept="image/*" capture="environment"></div>'));
+			actionArea.appendChild(el('<div class="field"><label for="end-odo">' + __("End odometer (km)") + '</label>' +
+				'<input type="number" id="end-odo" inputmode="numeric" min="0"></div>'));
+			actionArea.appendChild(el('<div class="field"><label for="end-remarks">' + __("Remarks") + '</label>' +
+				'<input type="text" id="end-remarks" maxlength="140"></div>'));
+			var end = el('<button class="btn btn-primary btn-block" type="button">' + __("End trip") + '</button>');
+			actionArea.appendChild(end);
+
+			end.onclick = function () {
+				var photo = document.getElementById("end-photo");
+				if (!photo.files.length) { showMsg(actionMsg, "error", __("A drop-location photo is required to end the trip.")); return; }
+				hideMsg(actionMsg); busy(end, true, __("Uploading photo..."));
+				uploadFile(photo)
+					.then(function (fileUrl) {
+						end.textContent = __("Ending...");
+						return api("end_trip", {
 							trip_name: tripName,
 							drop_photo: fileUrl,
 							end_odometer: document.getElementById("end-odo").value || null,
@@ -172,59 +414,116 @@ frappe.ready(function() {
 						});
 					})
 					.then(reload)
-					.catch(function(e) { alert(e); end.disabled = false; });
+					.catch(function (e) { busy(end, false); showMsg(actionMsg, "error", e); });
 			};
-			actionArea.appendChild(dropLabel);
-			actionArea.appendChild(endOdoLabel);
-			actionArea.appendChild(remarksLabel);
-			actionArea.appendChild(end);
+
 		} else {
-			var done = document.createElement("p");
-			done.className = "text-muted";
-			done.textContent = "No action needed right now.";
-			actionArea.appendChild(done);
+			var text = {
+				Completed: __("Trip finished. Waiting for In-Charge approval."),
+				Approved: __("Trip approved. No action needed."),
+				Rejected: __("You rejected this trip."),
+				Cancelled: __("This trip was cancelled."),
+			}[status] || __("No action needed right now.");
+			actionArea.appendChild(el('<p class="muted" style="margin:0">' + esc(text) + '</p>'));
 		}
 	}
 
-	function button(label, cls) {
-		var b = document.createElement("button");
-		b.className = "btn " + cls;
-		b.textContent = label;
-		return b;
+	renderActions();
+
+	// ------------------------------------------------------------------
+	// Expenses
+	// ------------------------------------------------------------------
+
+	var card = document.getElementById("expense-card");
+	var listEl = document.getElementById("expense-list");
+	var totalEl = document.getElementById("expense-total");
+	var expMsg = document.getElementById("expense-message");
+	var currency = card.dataset.currency || "";
+	var expenses = [];
+	try { expenses = JSON.parse(card.dataset.expenses || "[]"); } catch (e) { expenses = []; }
+
+	function money(n) {
+		var v = Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+		return currency ? currency + " " + v : v;
 	}
 
-	render();
-
-	var logExpenseBtn = document.getElementById("log-expense-btn");
-	logExpenseBtn.onclick = function() {
-		var photoInput = document.getElementById("expense-photo");
-		var msg = document.getElementById("expense-message");
-		var amount = document.getElementById("expense-amount").value;
-		if (!amount || !photoInput.files.length) {
-			msg.className = "msg-error";
-			msg.textContent = "Amount and a receipt photo are required.";
+	function renderExpenses(flashName) {
+		if (!expenses.length) {
+			listEl.innerHTML = '<p class="exp-empty">' + __("No expenses logged for this trip yet.") + '</p>';
+			totalEl.textContent = "";
 			return;
 		}
-		logExpenseBtn.disabled = true;
+		var total = 0;
+		listEl.innerHTML = expenses.map(function (x) {
+			if (x.status !== "Rejected") total += Number(x.amount || 0);
+			var slug = String(x.status || "Pending").toLowerCase();
+			return '<div class="exp' + (x.name === flashName ? " flash" : "") + '">' +
+				'<div class="exp-main"><b>' + esc(__(x.expense_type)) + '</b>' +
+				'<div class="muted">' + esc(x.expense_date) + ' &middot; ' + esc(x.name) + '</div>' +
+				(x.remarks ? '<div class="muted">' + esc(x.remarks) + '</div>' : "") +
+				(x.attachment ? '<a class="small" href="' + esc(x.attachment) + '" target="_blank" rel="noopener">' + __("View receipt") + '</a>' : "") +
+				'</div>' +
+				'<div class="exp-side"><b>' + esc(money(x.amount)) + '</b>' +
+				'<span class="pill pill-' + esc(slug) + '">' + esc(__(x.status)) + '</span></div></div>';
+		}).join("");
+		totalEl.textContent = __("Total") + ": " + money(total);
+	}
+
+	renderExpenses();
+
+	var form = document.getElementById("expense-form");
+	if (!form) return;
+
+	var toggle = document.getElementById("expense-toggle");
+	var photoInput = document.getElementById("expense-photo");
+	var preview = document.getElementById("expense-preview");
+	var amountInput = document.getElementById("expense-amount");
+	var submitBtn = document.getElementById("log-expense-btn");
+
+	function openForm(open) {
+		form.hidden = !open;
+		toggle.hidden = open;
+		if (open) amountInput.focus();
+	}
+	toggle.onclick = function () { hideMsg(expMsg); openForm(true); };
+	document.getElementById("expense-cancel").onclick = function () { openForm(false); };
+
+	photoInput.onchange = function () {
+		if (photoInput.files.length) { preview.src = URL.createObjectURL(photoInput.files[0]); preview.hidden = false; }
+		else { preview.hidden = true; }
+	};
+
+	form.onsubmit = function (ev) {
+		ev.preventDefault();
+		var amount = parseFloat(amountInput.value);
+		if (!(amount > 0)) { showMsg(expMsg, "error", __("Enter an amount greater than zero.")); amountInput.focus(); return; }
+		if (!photoInput.files.length) { showMsg(expMsg, "error", __("A receipt photo is required.")); return; }
+
+		hideMsg(expMsg);
+		busy(submitBtn, true, __("Uploading receipt..."));
 		uploadFile(photoInput)
-			.then(function(fileUrl) {
-				return callMethod("log_expense", {
+			.then(function (fileUrl) {
+				submitBtn.textContent = __("Saving...");
+				return api("log_expense", {
 					trip_name: tripName,
 					expense_type: document.getElementById("expense-type").value,
-					amount: amount,
+					amount: amount.toFixed(2),
 					attachment: fileUrl,
-					remarks: document.getElementById("expense-remarks").value || null,
+					remarks: document.getElementById("expense-remarks").value.trim() || null,
 				});
 			})
-			.then(function() {
-				msg.className = "msg-ok";
-				msg.textContent = "Expense submitted for approval.";
-				setTimeout(reload, 2000);
+			.then(function (row) {
+				busy(submitBtn, false);
+				if (row && row.name) expenses.unshift(row);
+				renderExpenses(row && row.name);
+				form.reset();
+				preview.hidden = true;
+				openForm(false);
+				showMsg(expMsg, "ok", __("Expense {0} submitted for approval.", [row && row.name ? row.name : ""]));
 			})
-			.catch(function(e) {
-				msg.className = "msg-error";
-				msg.textContent = e;
-				logExpenseBtn.disabled = false;
+			.catch(function (e) {
+				busy(submitBtn, false);
+				showMsg(expMsg, "error", e);
 			});
 	};
 });

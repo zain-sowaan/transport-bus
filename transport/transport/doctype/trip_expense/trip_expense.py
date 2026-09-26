@@ -10,14 +10,20 @@ duplicate-bill detection. Phase 3's job is just capturing it in the field."""
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime
+from frappe.utils import flt, now_datetime
 
 ACCOUNTS_ROLES = ("Transport Accounts", "System Manager")
 
 
 class TripExpense(Document):
 	def validate(self):
-		if self.amount and int(self.amount) <= 0:
+		# Values posted from the driver portal arrive as strings ("122"), and
+		# Frappe only casts Currency fields after validate() has run - so the
+		# old `self.amount <= 0` raised TypeError and rolled the insert back.
+		# Normalising first also catches 0, which `if self.amount and ...`
+		# silently let through.
+		self.amount = flt(self.amount, self.precision("amount"))
+		if self.amount <= 0:
 			frappe.throw(_("Amount must be greater than zero."))
 		self.check_duplicate_receipt()
 
@@ -25,21 +31,24 @@ class TripExpense(Document):
 		"""Prevent same bill upload twice (doc section 12) - matched by the
 		attached file's content hash, not filename/amount/date, so a
 		re-uploaded copy of the same receipt is caught even if the driver
-		changes the entered amount or date by mistake."""
+		changes the entered amount or date by mistake.
+
+		The hash is looked up by file_url alone: a receipt uploaded from the
+		driver portal is still an unattached File while this validate runs
+		(it only becomes attached to the Trip Expense on_update), so filtering
+		on attached_to_doctype here meant the check never fired for the very
+		channel it exists for."""
 		if not self.attachment:
 			return
 
-		content_hash = frappe.db.get_value(
-			"File", {"file_url": self.attachment, "attached_to_doctype": "Trip Expense"}, "content_hash"
-		)
+		content_hash = frappe.db.get_value("File", {"file_url": self.attachment}, "content_hash")
 		if not content_hash:
 			return
 
 		duplicate = frappe.db.sql(
 			"""
-			select te.name from `tabTrip Expense` te
-			inner join `tabFile` f
-				on f.file_url = te.attachment and f.attached_to_doctype = 'Trip Expense'
+			select distinct te.name from `tabTrip Expense` te
+			inner join `tabFile` f on f.file_url = te.attachment
 			where f.content_hash = %s and te.name != %s and te.status != 'Rejected'
 			limit 1
 			""",

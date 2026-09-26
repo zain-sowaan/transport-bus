@@ -1,0 +1,121 @@
+<style>
+	/* Shared look for the /driver pages. Kept as a Jinja include (not a
+	   public/css asset) so it ships without a `bench build`. */
+	.drv {
+		--drv-bg: #f4f6f8;
+		--drv-card: #ffffff;
+		--drv-border: #e2e6ea;
+		--drv-text: #1f272e;
+		--drv-muted: #6b7680;
+		--drv-accent: #1f6feb;
+		--drv-green: #1a7f37;
+		--drv-amber: #b35900;
+		--drv-red: #c62828;
+		--drv-purple: #6e40c9;
+		--drv-radius: 12px;
+		max-width: 560px; margin: 0 auto; padding: 12px 14px 48px;
+		color: var(--drv-text); font-size: 15px;
+	}
+	.drv * { box-sizing: border-box; }
+	.drv h1, .drv h2, .drv h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+	.drv a { color: inherit; }
+	.drv .muted { color: var(--drv-muted); }
+	.drv .small { font-size: 13px; }
+
+	/* Header */
+	.drv-hello { margin: 4px 0 14px; }
+	.drv-hello h1 { font-size: 22px; }
+	.drv-hello p { margin: 2px 0 0; color: var(--drv-muted); font-size: 13px; }
+
+	/* Stat tiles */
+	.drv-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+	.drv-stat { background: var(--drv-card); border: 1px solid var(--drv-border); border-radius: var(--drv-radius); padding: 10px 12px; }
+	.drv-stat b { display: block; font-size: 20px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+	.drv-stat span { font-size: 12px; color: var(--drv-muted); }
+	.drv-stat.alert b { color: var(--drv-amber); }
+
+	/* Tabs */
+	.drv-tabs { display: flex; background: #e9edf1; border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+	.drv-tabs a { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-weight: 600; font-size: 14px; color: var(--drv-muted); text-decoration: none; }
+	.drv-tabs a.active { background: var(--drv-card); color: var(--drv-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+	/* Filters */
+	.drv-filters { display: flex; gap: 8px; margin-bottom: 12px; }
+	.drv-filters select { flex: 1; }
+
+	/* Day groups + trip cards */
+	.drv-group { margin-bottom: 16px; }
+	.drv-group-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--drv-muted); margin: 0 2px 6px; }
+	.drv-group-label.overdue { color: var(--drv-red); }
+	.drv-trip {
+		display: flex; gap: 12px; background: var(--drv-card); border: 1px solid var(--drv-border);
+		border-radius: var(--drv-radius); padding: 12px; margin-bottom: 8px; text-decoration: none !important;
+	}
+	.drv-trip:hover { border-color: #c5ccd3; }
+	.drv-trip.needs-action { border-left: 4px solid var(--drv-amber); }
+	.drv-trip-time { min-width: 52px; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+	.drv-trip-time small { display: block; font-weight: 500; font-size: 11px; color: var(--drv-muted); }
+	.drv-trip-body { flex: 1; min-width: 0; }
+	.drv-trip-route { font-weight: 650; line-height: 1.3; }
+	.drv-trip-meta { font-size: 13px; color: var(--drv-muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+	.drv-trip-side { text-align: right; }
+
+	/* Status pills */
+	.pill { display: inline-block; font-size: 11.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; background: #eceff1; color: #455a64; white-space: nowrap; }
+	.pill-assigned, .pill-pending { background: #fff4e0; color: var(--drv-amber); }
+	.pill-accepted { background: #e6f4ea; color: var(--drv-green); }
+	.pill-started { background: #e3efff; color: var(--drv-accent); }
+	.pill-completed { background: #efe9fb; color: var(--drv-purple); }
+	.pill-approved, .pill-booked { background: #e6f4ea; color: var(--drv-green); }
+	.pill-rejected, .pill-cancelled { background: #fdecec; color: var(--drv-red); }
+	.pill-ot { background: #fff4e0; color: var(--drv-amber); }
+
+	/* Cards / sections */
+	.drv-card { background: var(--drv-card); border: 1px solid var(--drv-border); border-radius: var(--drv-radius); padding: 14px; margin-bottom: 12px; }
+	.drv-card h3 { font-size: 15px; margin-bottom: 10px; }
+	.drv-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+	.drv-card-head h3 { margin: 0; }
+
+	/* Key/value grid */
+	.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+	.kv div span { display: block; font-size: 12px; color: var(--drv-muted); }
+	.kv div b { font-weight: 600; font-size: 14px; word-break: break-word; }
+	.kv .full { grid-column: 1 / -1; }
+
+	/* Empty state */
+	.drv-empty { text-align: center; padding: 32px 16px; color: var(--drv-muted); background: var(--drv-card); border: 1px dashed var(--drv-border); border-radius: var(--drv-radius); }
+
+	/* Forms */
+	.drv .field { margin-bottom: 12px; }
+	.drv .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--drv-muted); margin-bottom: 4px; }
+	.drv .field label .req { color: var(--drv-red); }
+	.drv input[type=text], .drv input[type=number], .drv select, .drv textarea {
+		width: 100%; padding: 10px 12px; border: 1px solid #cfd6dc; border-radius: 8px; font-size: 16px; background: #fff; color: var(--drv-text);
+	}
+	.drv input:focus, .drv select:focus, .drv textarea:focus { outline: 2px solid rgba(31,111,235,.25); border-color: var(--drv-accent); }
+	.drv input[type=file] { width: 100%; font-size: 14px; padding: 8px; border: 1px dashed #cfd6dc; border-radius: 8px; background: #fafbfc; }
+	.drv .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+	/* Buttons */
+	.drv .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 16px; border-radius: 10px; border: none; cursor: pointer; font-weight: 650; font-size: 15px; }
+	.drv .btn[disabled] { opacity: .6; cursor: wait; }
+	.drv .btn-block { width: 100%; }
+	.drv .btn-primary { background: var(--drv-green); color: #fff; }
+	.drv .btn-info { background: var(--drv-accent); color: #fff; }
+	.drv .btn-danger { background: #fff; color: var(--drv-red); border: 1px solid #f2c2c2; }
+	.drv .btn-default { background: #eef1f4; color: var(--drv-text); }
+	.drv .btn-link { background: none; color: var(--drv-accent); padding: 6px 0; }
+	.drv .btn-row { display: flex; gap: 8px; }
+	.drv .btn-row .btn { flex: 1; }
+
+	/* Messages */
+	.drv-msg { border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-top: 10px; display: none; }
+	.drv-msg.show { display: block; }
+	.drv-msg.error { background: #fdecec; color: var(--drv-red); }
+	.drv-msg.ok { background: #e6f4ea; color: var(--drv-green); }
+	.drv-msg.info { background: #e3efff; color: var(--drv-accent); }
+
+	.drv-back { display: inline-block; font-size: 14px; color: var(--drv-accent) !important; margin-bottom: 8px; text-decoration: none; }
+	.drv-pager { display: flex; justify-content: space-between; margin-top: 8px; }
+	.drv-pager a { color: var(--drv-accent); font-weight: 600; text-decoration: none; }
+</style>

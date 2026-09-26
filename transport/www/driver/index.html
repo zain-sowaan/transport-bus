@@ -1,43 +1,88 @@
 {% extends "templates/web.html" %}
 
 {% block page_content %}
-<div class="driver-app">
-	<h2>My Trips</h2>
-
+{% include "templates/includes/driver_portal_styles.html" %}
+<div class="drv">
 	{% if error %}
-		<p class="text-muted">{{ error }}</p>
-	{% elif not trips %}
-		<p class="text-muted">No trips scheduled in the next 7 days.</p>
+		<div class="drv-empty">{{ error }}</div>
 	{% else %}
-		<div class="trip-list">
-			{% for trip in trips %}
-			<a class="trip-card status-{{ trip.status.lower().replace(' ', '-') }}" href="/driver/trip?name={{ trip.name }}">
-				<div class="trip-card-top">
-					<span class="trip-date">{{ frappe.utils.formatdate(trip.trip_date) }} &middot; {{ trip.scheduled_time }}</span>
-					<span class="trip-status">{{ trip.status }}{% if trip.needs_reallocation %} &middot; Needs Reallocation{% endif %}</span>
+		<div class="drv-hello">
+			<h1>{{ _("Hi, {0}").format(driver_name) }}</h1>
+			<p>{{ today_label }}</p>
+		</div>
+
+		<div class="drv-stats">
+			<div class="drv-stat"><b>{{ stats.today }}</b><span>{{ _("Trips today") }}</span></div>
+			<div class="drv-stat {% if stats.to_accept %}alert{% endif %}"><b>{{ stats.to_accept }}</b><span>{{ _("Waiting for you to accept") }}</span></div>
+			<div class="drv-stat"><b>{{ stats.month_trips }}</b><span>{{ _("Completed this month") }}{% if stats.month_km %} &middot; {{ stats.month_km }} km{% endif %}</span></div>
+			<div class="drv-stat"><b>{{ stats.pending_expense_count }}</b><span>{{ _("Expenses pending") }}{% if stats.pending_expense_count %} &middot; {{ stats.pending_expense_total }}{% endif %}</span></div>
+		</div>
+
+		<nav class="drv-tabs">
+			<a href="/driver" class="{% if view == 'upcoming' %}active{% endif %}">{{ _("Upcoming") }}</a>
+			<a href="/driver?view=history" class="{% if view == 'history' %}active{% endif %}">{{ _("History") }}</a>
+		</nav>
+
+		{% if view == "history" %}
+		<form class="drv-filters" method="get" action="/driver">
+			<input type="hidden" name="view" value="history">
+			<select name="month" onchange="this.form.submit()" aria-label="{{ _('Month') }}">
+				<option value="">{{ _("All past trips") }}</option>
+				{% for m in month_options %}
+				<option value="{{ m.value }}" {% if m.value == month %}selected{% endif %}>{{ m.label }}</option>
+				{% endfor %}
+			</select>
+			<select name="status" onchange="this.form.submit()" aria-label="{{ _('Status') }}">
+				<option value="">{{ _("Any status") }}</option>
+				{% for s in ["Completed", "Approved", "Rejected", "Cancelled"] %}
+				<option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ _(s) }}</option>
+				{% endfor %}
+			</select>
+		</form>
+		{% endif %}
+
+		{% if not groups %}
+			<div class="drv-empty">
+				{% if view == "history" %}{{ _("No past trips match these filters.") }}
+				{% else %}{{ _("No trips scheduled in the next 7 days.") }}{% endif %}
+			</div>
+		{% endif %}
+
+		{% for group in groups %}
+		<section class="drv-group">
+			<div class="drv-group-label {% if group.overdue %}overdue{% endif %}">{{ group.label }}</div>
+			{% for trip in group.trips %}
+			<a class="drv-trip {% if trip.needs_action %}needs-action{% endif %}" href="/driver/trip?name={{ trip.name | urlencode }}">
+				<div class="drv-trip-time">
+					{{ trip.time_label or "--:--" }}
+					<small>{{ _(trip.direction) if trip.direction else "" }}</small>
 				</div>
-				<div class="trip-card-route">{{ trip.from_place }} &rarr; {{ trip.to_place }}</div>
-				<div class="trip-card-meta">{{ trip.direction }}{% if trip.vehicle %} &middot; {{ trip.vehicle }}{% endif %}</div>
+				<div class="drv-trip-body">
+					<div class="drv-trip-route">{{ trip.from_place or "?" }} &rarr; {{ trip.to_place or "?" }}</div>
+					<div class="drv-trip-meta">
+						{% if group.overdue %}<span>{{ frappe.utils.formatdate(trip.trip_date) }}</span>{% endif %}
+						{% if trip.vehicle %}<span>{{ trip.vehicle }}</span>{% endif %}
+						{% if trip.km %}<span>{{ trip.km }} km</span>{% endif %}
+						{% if trip.expense_count %}<span>{{ trip.expense_count }} {{ _("expense") if trip.expense_count == 1 else _("expenses") }} &middot; {{ trip.expense_total }}</span>{% endif %}
+					</div>
+				</div>
+				<div class="drv-trip-side">
+					<span class="pill pill-{{ trip.status_slug }}">{{ _(trip.status) }}</span>
+					{% if trip.duty_type == "OT" %}<div style="margin-top:4px"><span class="pill pill-ot">OT</span></div>{% endif %}
+					{% if trip.needs_reallocation %}<div class="small muted" style="margin-top:4px">{{ _("Reallocating") }}</div>{% endif %}
+				</div>
 			</a>
 			{% endfor %}
+		</section>
+		{% endfor %}
+
+		{% if view == "history" and (page > 1 or has_more) %}
+		<div class="drv-pager">
+			{% set qs = "view=history" ~ ("&month=" ~ month if month else "") ~ ("&status=" ~ status_filter if status_filter else "") %}
+			<span>{% if page > 1 %}<a href="/driver?{{ qs }}&page={{ page - 1 }}">&larr; {{ _("Newer") }}</a>{% endif %}</span>
+			<span>{% if has_more %}<a href="/driver?{{ qs }}&page={{ page + 1 }}">{{ _("Older") }} &rarr;</a>{% endif %}</span>
 		</div>
+		{% endif %}
 	{% endif %}
 </div>
-
-<style>
-	.driver-app { max-width: 480px; margin: 0 auto; padding: 12px; }
-	.trip-list { display: flex; flex-direction: column; gap: 10px; }
-	.trip-card {
-		display: block; border: 1px solid #d1d8dd; border-radius: 8px; padding: 12px 14px;
-		text-decoration: none; color: inherit; border-left: 4px solid #8d99a6;
-	}
-	.trip-card.status-assigned { border-left-color: #f0a400; }
-	.trip-card.status-accepted { border-left-color: #2e7d32; }
-	.trip-card.status-started { border-left-color: #1976d2; }
-	.trip-card.status-completed, .trip-card.status-approved { border-left-color: #5e35b1; }
-	.trip-card.status-rejected, .trip-card.status-cancelled { border-left-color: #c62828; opacity: 0.7; }
-	.trip-card-top { display: flex; justify-content: space-between; font-size: 12px; color: #6c7680; margin-bottom: 6px; }
-	.trip-card-route { font-weight: 600; }
-	.trip-card-meta { font-size: 13px; color: #6c7680; margin-top: 4px; }
-</style>
 {% endblock %}
