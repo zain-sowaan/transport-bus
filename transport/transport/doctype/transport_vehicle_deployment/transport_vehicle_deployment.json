@@ -1,0 +1,136 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-09-27 18:36:12.857418",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "contract_item",
+  "vehicle",
+  "from_date",
+  "to_date",
+  "days",
+  "is_replacement",
+  "replaced_vehicle",
+  "column_break_etwb",
+  "start_odometer",
+  "end_odometer",
+  "km_run",
+  "extra_km_run",
+  "fuel_cost",
+  "sales_order_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Sales Order Item",
+   "no_copy": 1,
+   "options": "Sales Order Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vehicle",
+   "options": "Rental Vehicle"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date"
+  },
+  {
+   "fieldname": "days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Days",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.is_replacement==1",
+   "fieldname": "replaced_vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Replaced Vehicle",
+   "options": "Rental Vehicle"
+  },
+  {
+   "fieldname": "column_break_etwb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "start_odometer",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Start Odometer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "end_odometer",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "End Odometer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "km_run",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "KM Run",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fuel_cost",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Fuel Cost",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_replacement",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Replacement"
+  },
+  {
+   "fieldname": "extra_km_run",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Extra KM Run",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "sales_order_item.item_code",
+   "fieldname": "contract_item",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Contract Item",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-27 22:17:30.071455",
+ "modified_by": "Administrator",
+ "module": "Transport",
+ "name": "Transport Vehicle Deployment",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

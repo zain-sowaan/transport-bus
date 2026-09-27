@@ -9,10 +9,13 @@
   "project",
   "customer",
   "sales_order",
+  "billing_basis",
   "column_break_project",
   "period_from",
   "period_to",
   "status",
+  "vehicle_deployment_section",
+  "monthly_deployments",
   "trips_section",
   "trips",
   "totals_section",
@@ -105,6 +108,7 @@
    "reqd": 1
   },
   {
+   "depends_on": "eval:doc.billing_basis != 'Monthly per Vehicle'",
    "fieldname": "trips_section",
    "fieldtype": "Section Break",
    "label": "Trips"
@@ -278,11 +282,31 @@
    "fieldtype": "Float",
    "label": "Total Duty Hours",
    "read_only": 1
+  },
+  {
+   "fetch_from": "project.transport_billing_basis",
+   "fieldname": "billing_basis",
+   "fieldtype": "Select",
+   "label": "Billing Basis",
+   "options": "\nPer Trip\nPer Day\nMonthly per Vehicle",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.billing_basis == 'Monthly per Vehicle'",
+   "fieldname": "vehicle_deployment_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle Deployment"
+  },
+  {
+   "fieldname": "monthly_deployments",
+   "fieldtype": "Table",
+   "label": "Monthly Deployments",
+   "options": "Transport Vehicle Deployment"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-22 21:16:54.024413",
+ "modified": "2026-09-27 18:54:29.846430",
  "modified_by": "Administrator",
  "module": "Transport",
  "name": "Transport Timesheet",
