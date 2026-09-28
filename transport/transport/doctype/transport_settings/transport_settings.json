@@ -32,6 +32,8 @@
   "weekend_charge_item",
   "public_holiday_charge_item",
   "weekend_holiday_charge_basis",
+  "fuel_charge_item",
+  "extra_km_charge_item",
   "quality_section",
   "feedback_escalation_rating",
   "blacklist_threshold_points",
@@ -382,6 +384,20 @@
    "fieldtype": "Small Text",
    "label": "What Happened",
    "read_only": 1
+  },
+  {
+   "description": "Item used for the actual-fuel reimbursement line on a monthly-per-vehicle invoice. One line per vehicle deployment.",
+   "fieldname": "fuel_charge_item",
+   "fieldtype": "Link",
+   "label": "Fuel Charge Item",
+   "options": "Item"
+  },
+  {
+   "description": "Item used for the excess-kilometre line on a monthly-per-vehicle invoice, charged at the Sales Order line's Extra KM Rate.",
+   "fieldname": "extra_km_charge_item",
+   "fieldtype": "Link",
+   "label": "Extra KM Charge Item",
+   "options": "Item"
   }
  ],
  "grid_page_length": 50,
