@@ -20,16 +20,89 @@ frappe.ui.form.on("Trip", {
 			},
 		}));
 
-		const can_approve = ["Transport In-Charge", "Transport Operations", "System Manager"].some(
+		const is_office = ["Transport In-Charge", "Transport Operations", "System Manager"].some(
 			(role) => frappe.user.has_role(role)
 		);
-		if (!frm.is_new() && frm.doc.status === "Completed" && can_approve) {
+
+		if (!frm.is_new() && frm.doc.status === "Completed" && is_office) {
 			frm.add_custom_button(__("Approve"), () => {
 				frappe.call({
 					method: "transport.transport.operations.approve_trip",
 					args: { trip_name: frm.doc.name },
 					callback: () => frm.reload_doc(),
 				});
+			});
+		}
+
+		// Starting from the desk is for a driver who is not using the portal -
+		// one who phones in, or who has no portal account. The driver's own
+		// start asks for a vehicle photo and checks their position against the
+		// pickup point; neither exists here, so the odometer is all this can
+		// ask for and it stays optional.
+		// Ending from the desk, same trade as starting: the driver's own end asks
+		// for a photo of the drop location, which nobody at a desk has. Unlike
+		// the Server Script this replaces, the app method also recalculates
+		// duration and Duty/OT from the actual times - without that the trip
+		// stays costed on its planned hours.
+		if (!frm.is_new() && frm.doc.status === "Started" && is_office) {
+			frm.add_custom_button(__("End Trip"), () => {
+				frappe.prompt(
+					[
+						{
+							fieldname: "end_odometer",
+							label: __("End odometer (km)"),
+							fieldtype: "Float",
+							description: frm.doc.start_odometer
+								? __("Started at {0} km", [frm.doc.start_odometer])
+								: "",
+						},
+						{
+							fieldname: "driver_remarks",
+							label: __("Remarks"),
+							fieldtype: "Small Text",
+						},
+					],
+					(values) => {
+						frappe.call({
+							method: "transport.transport.operations.end_trip",
+							args: {
+								trip_name: frm.doc.name,
+								end_odometer: values.end_odometer || null,
+								driver_remarks: values.driver_remarks || null,
+							},
+							freeze: true,
+							callback: () => frm.reload_doc(),
+						});
+					},
+					__("End this trip"),
+					__("End")
+				);
+			});
+		}
+
+		if (!frm.is_new() && ["Assigned", "Accepted"].includes(frm.doc.status) && is_office) {
+			frm.add_custom_button(__("Start Trip"), () => {
+				frappe.prompt(
+					{
+						fieldname: "start_odometer",
+						label: __("Start odometer (km)"),
+						fieldtype: "Float",
+						reqd: 0,
+					},
+					(values) => {
+						frappe.call({
+							method: "transport.transport.operations.start_trip",
+							args: {
+								trip_name: frm.doc.name,
+								start_odometer: values.start_odometer || null,
+							},
+							freeze: true,
+							callback: () => frm.reload_doc(),
+						});
+					},
+					__("Start this trip"),
+					__("Start")
+				);
 			});
 		}
 	},
