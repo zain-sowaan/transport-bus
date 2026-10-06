@@ -2170,13 +2170,70 @@ def _save_capture(portal_name, html):
 
 
 def run_scheduled_syncs():
-	"""Scheduler entry point. Does nothing unless explicitly switched on."""
+	"""Scheduler entry point. Does nothing unless explicitly switched on.
+
+	**`get_syncable_portals()` is an authorization gate, not a capability one.**
+	It answers "may a fetch run against this portal at all" - enabled, authorized,
+	authorization not lapsed - and says nothing about whether anything can
+	actually fetch it with nobody present. This is the only caller that is
+	unattended by definition, so the capability test belongs here.
+
+	It was missing, and the cost was not an error but noise. The sweep ran daily
+	against three browser-only portals and produced a Sync Run each time that
+	found nothing and finished "Completed with Errors" with an empty error log.
+	Twenty-three of them accumulated in nine days. That matters because a real
+	browser fetch that fails looks exactly the same, so the runs that meant
+	something were buried under runs that never could.
+
+	Two tests, deliberately, because they catch drift in opposite directions:
+
+	* `fetch_mode == "Automated"` is the RECORD's declaration, and matches what
+	  `fetch_fines_for_vehicles` already filters on - the comment there spells
+	  out that "enabled for sync" means enabled for unattended sync.
+	* `fetch_implemented and supports_unattended` is the CODE's capability. A
+	  portal whose record claims Automated while its fetcher cannot deliver is
+	  how this drifted in the first place, and it is worth a log line rather
+	  than a silent skip: somebody set that field expecting nightly syncs that
+	  were never going to happen.
+	"""
 	if not frappe.db.get_single_value("Transport Settings", "enable_scheduled_fine_sync"):
 		return
 
 	from transport.transport.doctype.traffic_fine_portal.traffic_fine_portal import get_syncable_portals
+	from transport.transport.fine_sync.registry import fetcher_class_for
 
 	for portal in get_syncable_portals():
+		# Not declared automated: operator-assisted and unsupported portals are
+		# skipped in silence. That is the expected state for most of the
+		# registry and is not worth a log line every night.
+		if (portal.get("fetch_mode") or "") != "Automated":
+			continue
+
+		fetcher_class = fetcher_class_for(portal)
+		if not (fetcher_class and fetcher_class.fetch_implemented and fetcher_class.supports_unattended):
+			# Declared automated, cannot be. Said out loud: this is a portal
+			# somebody expects to be syncing itself, and it is not.
+			#
+			# NOT through `_log_error`, which takes a title only and fills the
+			# message from `get_traceback()`. There is no exception in flight
+			# here, so that returns "" - and log_error reads an empty message as
+			# "not supplied" and falls back to the traceback-with-locals
+			# rendering that `_log_error` exists to avoid. An explicit message
+			# is what keeps frame locals out of Error Log and Sentry.
+			frappe.log_error(
+				title=f"Scheduled fine sync skipped: {portal.name}".replace("\n", " "),
+				message=(
+					f"Fetch mode is Automated, but "
+					f"{fetcher_class.__name__ if fetcher_class else 'no fetcher is registered'} "
+					f"cannot run unattended (fetch_implemented="
+					f"{getattr(fetcher_class, 'fetch_implemented', None)}, supports_unattended="
+					f"{getattr(fetcher_class, 'supports_unattended', None)}).\n\n"
+					"Either the portal's fetch mode is wrong, or this portal needs a person. "
+					"Either way it will not sync on a schedule, and nothing was run."
+				),
+			)
+			continue
+
 		try:
 			run_sync(portal.name)
 		except Exception:

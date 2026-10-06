@@ -78,10 +78,19 @@ def get_fetcher(portal, credential=None):
 	"""Instantiate the fetcher for a portal, or explain why there isn't one."""
 	fetcher_class = fetcher_class_for(portal)
 	if not fetcher_class:
+		# Names what IS built rather than quoting a fixed count. The previous
+		# wording - "MOI Federated is the only route built so far, it covers six
+		# of the thirteen portals" - was true when one route existed and went
+		# quietly out of date as each fetcher landed. It is now the message a
+		# client sees whenever they press Fetch on a portal nobody has written
+		# yet, because the registry list is no longer narrowed to the portals
+		# that work, so it has to be right without anyone remembering to edit it.
+		built = ", ".join(sorted(FETCHERS_BY_KEY)) or "none"
 		frappe.throw(
 			_("No fetcher is implemented for {0} ({1} route). "
-			  "MOI Federated is the only route built so far - it covers six of the "
-			  "thirteen portals.").format(portal.name, portal.access_route),
+			  "Built so far: {2}, plus every portal reached through the MOI Federated "
+			  "route. This portal is recorded so its details are not lost, but nothing "
+			  "can read it yet.").format(portal.name, portal.access_route, built),
 			title=_("Portal Not Supported"),
 		)
 	return fetcher_class(portal, credential)

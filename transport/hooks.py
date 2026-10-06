@@ -318,12 +318,28 @@ permission_query_conditions = {
 	"Trip": "transport.transport.permissions.get_trip_permission_query_conditions",
 	"Trip Expense": "transport.transport.permissions.get_trip_expense_permission_query_conditions",
 	"Customer Request": "transport.transport.permissions.get_customer_request_permission_query_conditions",
-	# Temporary, and it belongs in THIS dict rather than a second one near the
-	# commented example above: hooks.py is an ordinary module, so a second
-	# `permission_query_conditions = {...}` does not merge, it rebinds - the
-	# earlier one is discarded in silence and its hook simply never runs.
-	# Remove this line to show all thirteen portals again.
-	"Traffic Fine Portal": "transport.transport.portal_visibility.portal_query_conditions",
+	# OFF since 2026-10-06. Every portal is listed again, including ones nothing
+	# can fetch yet.
+	#
+	# The narrowing was only ever meant to cut noise while two portals worked,
+	# and it stopped paying for itself once portals started being added: a new
+	# record simply vanished from the list, which reads as a save that failed
+	# rather than a filter doing its job. A portal record documents a real
+	# authority whether or not we have written its fetcher, and the client has
+	# to be able to see it. Pressing Fetch on one is what says it is not
+	# supported yet - and `registry.py` is deliberately built to answer that
+	# with a reason rather than with silence.
+	#
+	# To turn it back on, uncomment the line below. `portal_visibility.py` is
+	# still there and now derives the rule from the registry instead of a
+	# hardcoded list, so it needs no editing when a fetcher is added.
+	#
+	# If it IS re-enabled, note it belongs in THIS dict rather than a second
+	# one near the commented example above: hooks.py is an ordinary module, so
+	# a second `permission_query_conditions = {...}` does not merge, it rebinds
+	# - the earlier one is discarded in silence and its hook never runs.
+	#
+	# "Traffic Fine Portal": "transport.transport.portal_visibility.portal_query_conditions",
 }
 
 has_permission = {
